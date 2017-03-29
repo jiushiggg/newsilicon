@@ -97,6 +97,7 @@ extern RAIL_TxOptions_t txOptions;
 // If this pointer is not NULL, call RAIL_TxStartWithOptions
 extern RAIL_TxOptions_t *txOptionsPtr;
 
+
 /**
  * @enum AppMode
  * @brief Enumeration of RailTest transmit states.
@@ -155,4 +156,7 @@ void PeripheralDisable(void);
 void PeripheralEnable(void);
 void usDelay(uint32_t microseconds);
 void serialWaitForTxIdle(void);
+
+void print_RAIL_status(char* mydebug);
+
 #endif // __APPS_COMMON_H__

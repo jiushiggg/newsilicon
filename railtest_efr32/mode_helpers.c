@@ -66,11 +66,16 @@ void scheduleNextTx(void)
   // Schedule the next tx if there are more coming
   if (txCount > 0 || currentAppMode() == TX_CONTINUOUS)
   {
+	//todo
+	print_RAIL_status("continue_send");
     RAIL_TimerSet(continuousTransferPeriod * 1000, RAIL_TIME_DELAY);
+
   }
   else if (currentAppMode() == TX_N_PACKETS || currentAppMode() == TX_SCHEDULED
            || currentAppMode() == TX_UNDERFLOW || currentAppMode() == TX_CANCEL)
   {
+		//todo
+	print_RAIL_status("single_send");
     setNextAppMode(NONE, NULL);
   }
   else

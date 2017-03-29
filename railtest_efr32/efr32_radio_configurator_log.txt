@@ -7,7 +7,7 @@ API version: 1.11.1
 
 - Informational data:
 Preamble Binary Pattern = 01010101010101010101010101010101 
-Sync Word Binary Pattern = 01010010010101100111100001010011 
+Sync Word Binary Pattern = 10100001101000101010001110100100 
 Calculated Actual Bandwidth = 1262400 
 Calculated baudrate = 500000 
 
@@ -34,4 +34,4 @@ RX Baudrate offset = 0 Hz
 AGC Speed = 1 
 Frequency Compensation Mode = 3 
 Preamble on the air: 01010101010101010101010101010101
-Syncword 0 on the air: 01010010010101100111100001010011
+Syncword 0 on the air: 10100001101000101010001110100100

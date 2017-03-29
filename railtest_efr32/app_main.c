@@ -142,8 +142,162 @@ void updateDisplay(void);
 void processPendingCalibrations(void);
 void printAckTimeout(void);
 
+///******syncword config************/////
+uint32_t changesyncword;
+uint32_t selfsyncword[3] = {0x00016040UL, 0xCA1E6A4AUL,0xFFFFFFFFUL,};
+uint32_t change_syncword(uint32_t souce)
+{
+	uint32_t t = 0;
+    uint32_t i = 0;
+    uint32_t data;
+	for( i = 0;i<4;i++)
+	{
+		t>>=1;
+		if(souce & 0x80000000)
+		{
+			t|=0x80000000;
+		}
+		if(souce & 0x08000000)
+		{
+			t|=0x08000000;
+		}
+		if(souce & 0x00800000)
+		{
+			t|=0x00800000;
+		}
+        if(souce & 0x00080000)
+		{
+			t|=0x00080000;
+		}
+         if(souce & 0x00008000)
+		{
+			t|=0x00008000;
+		}
+         if(souce & 0x00000800)
+		{
+			t|=0x00000800;
+		}
+        if(souce & 0x00000080)
+		{
+			t|=0x00000080;
+		}
+        if(souce & 0x00000008)
+		{
+			t|=0x00000008;
+		}
+		souce<<=1;
+	}
+	changesyncword = ((t&0x0000000f)<<28) + ((t&0x000000f0)<<20) + ((t&0x00000f00)<<12) +  ((t&0x0000f000)<<4) + ((t&0x000f0000)>>4)+((t&0x00f00000)>>12)+((t&0x0f000000)>>20)+((t&0xf0000000)>>28) ;
+	return changesyncword;
+}
+
+void print_RAIL_status(char* mydebug)
+{
+	char serial_debug = 0;
+	serial_debug = (uint8_t)RAIL_RfStateGet();
+	responsePrint(mydebug, "RAIL state:%d", serial_debug);
+}
+void set_iodebug(void)
+{
+	char *para1[] =  {"mytx", "PC10", "TXACTIVE"};
+	char *para2[] =  {"myrx", "PC11", "RXACTIVE"};
+	char *para3[] =  {"myrx", "PF3", "PTIDATA"};
+	setDebugSignal(3, para1);
+	setDebugSignal(3, para2);
+	setDebugSignal(3, para3);
+}
+
 int main(void)
 {
+  // Initialize the chip
+  CHIP_Init();
+
+  // Grab the reset cause
+  uint32_t resetCause = RMU_ResetCauseGet();
+  RMU_ResetCauseClear(); // So resetCause is rational and not an accmulated mess
+  // Release GPIOs that were held by EM4h
+  // This is reportedly a workaround that I've found needs to be done
+  // *before* appHalInit() tries to start oscillators, otherwise we'll
+  // hang indefinitely waiting for the oscillator to become ready.
+  if (resetCause & RMU_RSTCAUSE_EM4RST)
+  {
+    EMU->CMD = EMU_CMD_EM4UNLATCH;
+  }
+
+  // Initialize hardware for application
+  appHalInit();
+
+  // Initialize Radio
+  RAIL_RfInit(&railInitParams);
+
+  // Initialize Radio Calibrations
+  RAIL_CalInit(&railCalInitParams);
+
+  // Configure modem, packet handler
+  changeRadioConfig(currentConfig);
+
+  // Configure RAIL callbacks with no appended info
+  RAIL_RxConfig((  RAIL_RX_CONFIG_FRAME_ERROR
+                 | RAIL_RX_CONFIG_SYNC1_DETECT
+                 | RAIL_RX_CONFIG_ADDRESS_FILTERED
+                 | RAIL_RX_CONFIG_BUFFER_OVERFLOW
+                 | RAIL_RX_CONFIG_SCHEDULED_RX_END),
+                false);
+
+  RAIL_SetRxTransitions(RAIL_RF_STATE_RX, RAIL_RF_STATE_RX,
+                        RAIL_IGNORE_NO_ERRORS);
+  RAIL_SetTxTransitions(RAIL_RF_STATE_RX, RAIL_RF_STATE_RX);
+
+  // Initialize the queue we use for tracking packets
+  if (!queueInit(&rxPacketQueue, MAX_QUEUE_LENGTH)) { while(1); }
+
+  updateDisplay();
+
+  printf("\n"APP_DEMO_STRING_INIT"\n");
+  if (resetCause & RMU_RSTCAUSE_EM4RST)
+  {
+    responsePrint("sleepWoke", "EM:4%c,SerialWakeup:No,RfSensed:%s",
+                  (((EMU->EM4CTRL & EMU_EM4CTRL_EM4STATE)
+                    == EMU_EM4CTRL_EM4STATE_EM4S) ? 's' : 'h'),
+                  RAIL_RfSensed() ? "Yes" : "No");
+  }
+  printf("> ");
+  ciInitState(&state, ciBuffer, sizeof(ciBuffer), commands);
+
+  // Initialize autoack data
+  RAIL_AutoAckLoadBuffer(&ackPayload);
+  set_iodebug();
+  while(1)
+  {
+    processInputCharacters();
+
+    rfSensedCheck();
+
+    sendPacketIfPending();
+
+    finishTxSequenceIfPending();
+
+    changeAppModeIfPending();
+
+    printReceivedPacket();
+
+    printNewTxError();
+
+    checkTimerExpiration();
+
+    updateDisplay();
+
+    processPendingCalibrations();
+
+    printAckTimeout();
+  }
+} //main()
+
+/*
+
+int main(void)
+{
+
   // Initialize the chip
   CHIP_Init();
 
@@ -201,7 +355,12 @@ int main(void)
   // Initialize autoack data
   RAIL_AutoAckLoadBuffer(&ackPayload);
 
+  print_RAIL_status();
+
   RAIL_RxStart(channel); // Start in receive mode
+
+  print_RAIL_status();
+
   while(1)
   {
     processInputCharacters();
@@ -226,8 +385,8 @@ int main(void)
 
     printAckTimeout();
   }
-} //main()
-
+}
+*/
 /*
 int main(void)
 {
@@ -303,6 +462,8 @@ void RAILCb_RxPacketReceived(void *rxPacketHandle)
 
   counters.receive++;
 
+  //todo
+  print_RAIL_status("my_received");
   // Count packets that we received but had no memory to store
   rxPacketInfo = (RAIL_RxPacketInfo_t*)memoryPtrFromHandle(rxPacketHandle);
   if (rxPacketInfo == NULL)
@@ -386,6 +547,8 @@ void RAILCb_RxRadioStatusExt(uint32_t status)
   {
     receivingPacket = true;
     counters.syncDetect++;
+	//todo
+	print_RAIL_status("my_rec_status");
   }
   if (status & RAIL_RX_CONFIG_PREAMBLE_DETECT)
   {
@@ -426,6 +589,8 @@ void RAILCb_TxRadioStatus(uint8_t status)
   newTxError = true;
   failPackets++;
   scheduleNextTx();
+	//todo
+	print_RAIL_status("send_status");
 }
 
 void RAILCb_TimerExpired(void)
@@ -578,6 +743,14 @@ void changeRadioConfig(int newConfig)
 
   // Set us to a valid channel for this config and force an update in the main
   // loop to restart whatever action was going on
+  selfsyncword[1] = change_syncword(0x52567853);
+
+  if (RAIL_RadioConfig((void*)configList[newConfig])) { while(1); }
+
+  if (RAIL_RadioConfig((void*)configList[1])) { while(1); }
+
+  if (RAIL_RadioConfig((void*)configList[2])) { while(1); }
+
   changeChannelConfig(newConfig);
   currentConfig = newConfig;
 }

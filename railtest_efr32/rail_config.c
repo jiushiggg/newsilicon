@@ -65,7 +65,7 @@ const uint32_t generated[] = {
   0x00016034UL, 0x000008A2UL,
   0x00016038UL, 0x0102000AUL,
   0x0001603CUL, 0x00100012UL,
-  0x00016040UL, 0xCA1E6A4AUL,
+  0x00016040UL, 0x25C54585UL,
   0x00016044UL, 0x00000000UL,
   0x00016048UL, 0x1DE00714UL,
   0x0001604CUL, 0x00000000UL,
@@ -88,11 +88,36 @@ const uint32_t generated[] = {
   0xFFFFFFFFUL,
 };
 
+const uint32_t rate_500K[] =
+{
 
+};
+
+const uint32_t rate_100K[]=
+{
+		0x01010FFCUL, 0x0003C008UL,
+		0x00014140UL, 0x008800E2UL,
+		0x00014144UL, 0x1153E6C1UL,
+		0x0001601CUL, 0x2002C01FUL,
+		0x00016024UL, 0x000CD000UL,
+		0x00016030UL, 0x00FF2FD0UL,
+		0x00016034UL, 0x00000B2EUL,
+		0x00016038UL, 0x01880020UL,
+		0x00016048UL, 0x11200714UL,
+		0x00016050UL, 0x003503B4UL,
+		0x0001701CUL, 0x82710060UL,
+		0x00017074UL, 0x00000213UL,
+		0xFFFFFFFFUL,
+};
+
+extern uint32_t selfsyncword[];
 const uint32_t *configList[] = {
   
   generated,
+  selfsyncword,
+  rate_100K,
 };
+
 
 const char *configNames[] = {
   
@@ -102,7 +127,7 @@ const char *configNames[] = {
 
 RAIL_ChannelConfigEntry_t generated_channels[] = {
 
-  {0, 20, 1000000, 2479000000},
+  {0, 20, 1000000, 2401000000},
 };
 
 const RAIL_ChannelConfig_t generated_channelConfig = {

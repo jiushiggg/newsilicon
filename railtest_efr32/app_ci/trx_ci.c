@@ -174,6 +174,7 @@ void rxAt(int argc, char **argv)
 
   // Enable scheduled receive mode
   uint8_t res = RAIL_ScheduleRx(channel, &rxCfg);
+  print_RAIL_status("myRAIL_sche");
   if (res != RAIL_STATUS_NO_ERROR)
   {
     responsePrintError(argv[0], 27, "Could not start scheduled receive %d", res);
