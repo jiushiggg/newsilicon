@@ -427,6 +427,5 @@ void setDebugSignal(int argc, char **argv)
 
   // Configure this GPIO as an output low to finish enabling this signal
   GPIO_PinModeSet(pin->gpioPort, pin->gpioPin, gpioModePushPull, 0);
-
   responsePrint(argv[0], "Pin:%s,Signal:%s", pin->name, signal->name);
 }

@@ -92,21 +92,54 @@ static CommandEntry_t commands[] = {
 static CommandState_t state;
 static char ciBuffer[APP_COMMAND_INTERFACE_BUFFER_SIZE];
 
+
+const uint32_t generated_100kbps[] = {
+  0x01010FFCUL, 0x0003C008UL,
+  0x00014140UL, 0x008800E2UL,
+  0x00014144UL, 0x1153E6C1UL,
+  0x0001601CUL, 0x2002C01FUL,
+  0x00016024UL, 0x000CD000UL,
+  0x00016030UL, 0x00FF2FD0UL,
+  0x00016034UL, 0x00000B2EUL,
+  0x00016038UL, 0x01880020UL,
+  0x00016048UL, 0x11200714UL,
+  0x00016050UL, 0x003503B4UL,
+  0x0001701CUL, 0x82710060UL,
+  0x00017074UL, 0x00000213UL,
+  0xFFFFFFFFUL,
+};
+
+const uint32_t generated_500kbps[] = {
+  0x01010FFCUL, 0x0003C00BUL,
+  0x00014140UL, 0x00880067UL,
+  0x00014144UL, 0x1153E6C0UL,
+  0x0001601CUL, 0x1802C01FUL,
+  0x00016024UL, 0x000C5000UL,
+  0x00016030UL, 0x00FF0990UL,
+  0x00016034UL, 0x000008A2UL,
+  0x00016038UL, 0x0102000AUL,
+  0x00016048UL, 0x1DE00714UL,
+  0x00016050UL, 0x002B03D1UL,
+  0x0001701CUL, 0x82720060UL,
+  0x00017074UL, 0x00000223UL,
+  0xFFFFFFFFUL,
+};
+
 // Channel Variables
 uint16_t channel = 0;
 
 // Generic
 uint8_t txData[APP_MAX_PACKET_LENGTH] = {
-  0x0F, 0x0E, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66,
+  0x1A, 0x0E, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66,
   0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE,
 };
-RAIL_TxData_t transmitPayload = { &txData[0], 16 };
+RAIL_TxData_t transmitPayload = { &txData[0], 0x1A };
 
 uint8_t ackData[RAIL_AUTOACK_MAX_LENGTH] = {
-  0x0F, 0x0E, 0xF1, 0xE2, 0xD3, 0xC4, 0xB5, 0xA6,
+  0x1a, 0x0E, 0xF1, 0xE2, 0xD3, 0xC4, 0xB5, 0xA6,
   0x97, 0x88, 0x79, 0x6A, 0x5B, 0x4C, 0x3D, 0x2E,
 };
-RAIL_AutoAckData_t ackPayload = { &ackData[0], 16 };
+RAIL_AutoAckData_t ackPayload = { &ackData[0], 0X1A };
 
 // Helper buffer for printing received packet data
 static char packetPrintBuffer[(APP_MAX_PACKET_LENGTH+1)*5];
@@ -144,12 +177,13 @@ void printAckTimeout(void);
 
 ///******syncword config************/////
 uint32_t changesyncword;
-uint32_t selfsyncword[3] = {0x00016040UL, 0xCA1E6A4AUL,0xFFFFFFFFUL,};
+//uint32_t syncwordcnf[3] = {0x00016040UL, 0xCA1E6A4AUL,0xFFFFFFFFUL,};
+uint32_t syncwordcnf[3] = {0x00016040UL, 0x0UL,0xFFFFFFFFUL};
+uint32_t lencnf[] = {0x00010018UL, 0x0UL, 0xFFFFFFFFUL};
 uint32_t change_syncword(uint32_t souce)
 {
 	uint32_t t = 0;
     uint32_t i = 0;
-    uint32_t data;
 	for( i = 0;i<4;i++)
 	{
 		t>>=1;
@@ -187,8 +221,7 @@ uint32_t change_syncword(uint32_t souce)
 		}
 		souce<<=1;
 	}
-	changesyncword = ((t&0x0000000f)<<28) + ((t&0x000000f0)<<20) + ((t&0x00000f00)<<12) +  ((t&0x0000f000)<<4) + ((t&0x000f0000)>>4)+((t&0x00f00000)>>12)+((t&0x0f000000)>>20)+((t&0xf0000000)>>28) ;
-	return changesyncword;
+	return ((t&0x0000000f)<<28) + ((t&0x000000f0)<<20) + ((t&0x00000f00)<<12) +  ((t&0x0000f000)<<4) + ((t&0x000f0000)>>4)+((t&0x00f00000)>>12)+((t&0x0f000000)>>20)+((t&0xf0000000)>>28) ;
 }
 
 void print_RAIL_status(char* mydebug)
@@ -206,6 +239,51 @@ void set_iodebug(void)
 	setDebugSignal(3, para2);
 	setDebugSignal(3, para3);
 }
+void myChangeRadioConfig(uint8_t channel, bps_enum bps, uint8_t* ID, uint8_t len)
+{
+#define BASE_FREQ			2400000000
+#define CHANNEL_SPACING		500000
+	const uint32_t * p;
+
+	RAIL_RfIdle();
+	if (0xff == channel){
+		goto bpsconf;
+	}
+	//channel
+	if (0 == channel%2)
+	{
+		generated_channels[0].baseFrequency = BASE_FREQ + channel*CHANNEL_SPACING;
+	}
+	if (1 == channel%2)
+	{
+		generated_channels[0].baseFrequency += CHANNEL_SPACING;
+	}
+	RAIL_ChannelConfig(channelConfigs[0]); //channel
+
+bpsconf:
+	//bps
+	switch(bps){
+		case BPS100: p = configList[1];
+			break;
+		case BPS500: p = configList[2];
+			break;
+		default:
+			break;
+	}
+	if (RAIL_RadioConfig((void*)p)) { while(1); }
+
+	//ID
+	if (NULL != ID)
+	{
+		syncwordcnf[1] = change_syncword((uint32_t)ID[0]<<24|(uint32_t)ID[1]<<16|(uint32_t)ID[2]<<8 | (uint32_t)ID[3]);
+		if (RAIL_RadioConfig((void*)configList[3])) { while(1); }
+	}
+
+	//len
+	lencnf[1] = len-1;
+	if (RAIL_RadioConfig((void*)configList[4])) { while(1); }
+}
+uint8_t ID[4] = {0X52, 0X56,0X78,0X54};
 
 int main(void)
 {
@@ -235,7 +313,7 @@ int main(void)
 
   // Configure modem, packet handler
   changeRadioConfig(currentConfig);
-
+  myChangeRadioConfig(8, BPS500, ID, 16);
   // Configure RAIL callbacks with no appended info
   RAIL_RxConfig((  RAIL_RX_CONFIG_FRAME_ERROR
                  | RAIL_RX_CONFIG_SYNC1_DETECT
@@ -267,6 +345,7 @@ int main(void)
   // Initialize autoack data
   RAIL_AutoAckLoadBuffer(&ackPayload);
   set_iodebug();
+//todo
   while(1)
   {
     processInputCharacters();
@@ -290,6 +369,7 @@ int main(void)
     processPendingCalibrations();
 
     printAckTimeout();
+
   }
 } //main()
 
@@ -451,7 +531,7 @@ void RAILCb_TxPacketSent(RAIL_TxPacketInfo_t *txPacketInfo)
 
   scheduleNextTx();
 }
-
+//todo
 void RAILCb_RxPacketReceived(void *rxPacketHandle)
 {
   // Always load, in case we have to transition to TX
@@ -463,7 +543,7 @@ void RAILCb_RxPacketReceived(void *rxPacketHandle)
   counters.receive++;
 
   //todo
-  print_RAIL_status("my_received");
+//  print_RAIL_status("my_received");
   // Count packets that we received but had no memory to store
   rxPacketInfo = (RAIL_RxPacketInfo_t*)memoryPtrFromHandle(rxPacketHandle);
   if (rxPacketInfo == NULL)
@@ -548,7 +628,7 @@ void RAILCb_RxRadioStatusExt(uint32_t status)
     receivingPacket = true;
     counters.syncDetect++;
 	//todo
-	print_RAIL_status("my_rec_status");
+//	print_RAIL_status("my_rec_status");
   }
   if (status & RAIL_RX_CONFIG_PREAMBLE_DETECT)
   {
@@ -738,18 +818,17 @@ void changeRadioConfig(int newConfig)
   RAIL_RfIdle();
 
   // Reconfigure the radio parameters
+
   RAIL_PacketLengthConfigFrameType(frameTypeConfigList[newConfig]);
   if (RAIL_RadioConfig((void*)configList[newConfig])) { while(1); }
 
   // Set us to a valid channel for this config and force an update in the main
   // loop to restart whatever action was going on
-  selfsyncword[1] = change_syncword(0x52567853);
+//  selfsyncword[1] = change_syncword(0x52567854);
 
-  if (RAIL_RadioConfig((void*)configList[newConfig])) { while(1); }
+//  if (RAIL_RadioConfig((void*)configList[2])) { while(1); }
 
-  if (RAIL_RadioConfig((void*)configList[1])) { while(1); }
-
-  if (RAIL_RadioConfig((void*)configList[2])) { while(1); }
+//  if (RAIL_RadioConfig((void*)configList[3])) { while(1); }
 
   changeChannelConfig(newConfig);
   currentConfig = newConfig;

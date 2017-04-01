@@ -30,7 +30,12 @@
 #include "rail_config.h"
 
 #include "hal_common.h"
+#include "response_print.h"
+#include "retargetserial.h"
 
+#include "rf_protocol.h"
+#include "bank2.h"
+#include "system.h"
 
 // Display buffer size
 #ifndef APP_DISPLAY_BUFFER_SIZE
@@ -101,7 +106,7 @@ static void switchMasterAppState(void);
 static void switchSlaveAppState(void);
 static void updateDisplay(void);
 void slaveTimerExpiredCallback( RTCDRV_TimerID_t id, void *incomingPacket);
-
+void myChangeRadioConfig(UINT8 channel, bps_enum bps, UINT8* ID, UINT8 len);
 
 /******************************************************************************
  * App constants and variables
@@ -159,7 +164,7 @@ RAIL_TxData_t masterTxData;         // application payload sent during a TX
 
 #define SLAVE_ON_TIME         15    // time to stay on (ms)
 #define SLAVE_OFF_TIME        2500  // time to stay off (ms)
-#define SLAVE_BLAST_RX_DELAY  30    // keep waiting for blast to end (ms)
+#define SLAVE_BLAST_RX_DELAY  1000    // keep waiting for blast to end (ms)
 
 int slaveRxBlastId = 0;       // blast ID of the blast received
 int slaveRxBlastCount = 0;    // count of total blasts received
@@ -180,6 +185,7 @@ void set_iodebug(void)
 /******************************************************************************
  * App main
  *****************************************************************************/
+uint8_t ID[] ={0X52,0X56,0X78,0X53};
 int main(void)
 {
   // Initialize the chip
@@ -192,7 +198,9 @@ int main(void)
 
   // Initialize the BSP
   BSP_Init( BSP_INIT_BCC );
-
+  // Initialize the USART and map LF to CRLF
+  RETARGET_SerialInit();
+  RETARGET_SerialCrLf(1);
   // Enable the buttons on the board
   for (int i=0; i<BSP_NO_OF_BUTTONS; i++)
   {
@@ -215,6 +223,7 @@ int main(void)
   // Configure modem, packet handler
   changeRadioConfig(currentConfig);
 
+  myChangeRadioConfig(8, BPS100, ID, 16);
   // Configure RAIL callbacks with no appended info
   RAIL_RxConfig((  RAIL_RX_CONFIG_PREAMBLE_DETECT
                  | RAIL_RX_CONFIG_INVALID_CRC
@@ -225,7 +234,18 @@ int main(void)
 
   set_iodebug();
   updateDisplay();
-  
+  /*
+  while(1)
+  {
+		if(gEventFlag&EVENT_FLAG_RFDATA)
+		{
+			gEventFlag ^= EVENT_FLAG_RFDATA;
+//			rf_fsm();
+		}
+
+  }
+  */
+
   while(1) {
     // process button press behavior
     serviceButtonPresses();
@@ -237,6 +257,7 @@ int main(void)
         || forceStateChange) {
       forceStateChange = false;
       if (appMode == DUTY_CYCLE_MODE) {
+    	responsePrint("duty", "duty idle:");//todo
         switchDutyCycleAppState();
       } else if (appMode == SLAVE_MODE) {
         switchSlaveAppState();
@@ -245,6 +266,7 @@ int main(void)
       }
     }
   }
+
 }
 
 /******************************************************************************
@@ -277,6 +299,51 @@ static void changeRadioConfig(int newConfig)
   // loop to restart whatever action was going on
   RAIL_ChannelConfig(channelConfigs[newConfig]);
   currentConfig = newConfig;
+}
+
+void myChangeRadioConfig(uint8_t channel, bps_enum bps, uint8_t* ID, uint8_t len)
+{
+#define BASE_FREQ			2400000000
+#define CHANNEL_SPACING		500000
+	const uint32_t * p;
+
+	RAIL_RfIdle();
+	if (0xff == channel){
+		goto bpsconf;
+	}
+	//channel
+	if (0 == channel%2)
+	{
+		generated_channels[0].baseFrequency = BASE_FREQ + channel*CHANNEL_SPACING;
+	}
+	if (1 == channel%2)
+	{
+		generated_channels[0].baseFrequency += CHANNEL_SPACING;
+	}
+	RAIL_ChannelConfig(channelConfigs[0]); //channel
+
+bpsconf:
+	//bps
+	switch(bps){
+		case BPS100: p = configList[1];
+			break;
+		case BPS500: p = configList[2];
+			break;
+		default:
+			break;
+	}
+	if (RAIL_RadioConfig((void*)p)) { while(1); }
+
+	//ID
+	if (NULL != ID)
+	{
+		syncwordcnf[1] = change_syncword((uint32_t)ID[0]<<24|(uint32_t)ID[1]<<16|(uint32_t)ID[2]<<8 | (uint32_t)ID[3]);
+		if (RAIL_RadioConfig((void*)configList[3])) { while(1); }
+	}
+
+	//len
+	lencnf[1] = len-1;
+	if (RAIL_RadioConfig((void*)configList[4])) { while(1); }
 }
 
 /**************************************************************************//**
@@ -429,24 +496,29 @@ static void switchDutyCycleAppState(void)
     case IDLE:
       RAIL_TimerSet(DUTY_CYCLE_OFF_TIME, RAIL_TIME_DELAY);
       RAIL_RfIdle();
+      responsePrint("duty", "duty idle:");//todo
       EMU_EnterEM1();
       break;
     case PREAMBLE_RX:
       RAIL_TimerSet(DUTY_CYCLE_PREAMBLE_ON_TIME, RAIL_TIME_DELAY);
+      responsePrint("duty", "preamble_rx:");//todo
       break;
     case SYNC_RX:
       // do nothing.. just wait.
+      responsePrint("duty", "sync_rx:");//todo
       break;
     case PACKET_RX:
       RAIL_RfIdle();
       RAIL_RxStart(channel);
       RAIL_TimerSet(DUTY_CYCLE_ON_TIME, RAIL_TIME_DELAY);
+      responsePrint("duty", "packet_rx:");//todo
       break;
     case PACKET_TX:
       generatePayload(&dutyCycleTxData, 0);
       RAIL_RfIdle();
       RAIL_TxDataLoad(&dutyCycleTxData);
       RAIL_TxStart(channel, NULL, NULL);
+      responsePrint("duty", "packet_tx:");//todo
       break;
     default:
     {
@@ -471,16 +543,19 @@ static void switchMasterAppState(void)
   switch (appState) {
     case IDLE:
       RAIL_RfIdle();
+      responsePrint("master", "idle:");//todo
       break;
     case PACKET_RX:
       RAIL_TimerSet(MASTER_ACK_WAITING_TIME, RAIL_TIME_DELAY);
       RAIL_RfIdle();
       RAIL_RxStart(channel);
+      responsePrint("master", "packet_rx:");//todo
       break;
     case MASTER_BLAST_TX:
       generatePayload(&masterTxData, masterTxBlastId);
       RAIL_TxDataLoad(&masterTxData);
       RAIL_TxStart(channel, NULL, NULL);
+      responsePrint("master", "blast_tx:");//todo
       break;
     default:
     {
@@ -510,22 +585,26 @@ static void switchSlaveAppState(void)
       RTCDRV_StartTimer(slaveRtcId, rtcdrvTimerTypeOneshot, SLAVE_OFF_TIME, slaveTimerExpiredCallback, NULL);
       RAIL_RfIdle();
       EMU_EnterEM2(true);
+      responsePrint("slave", "idle:");//todo
       break;
     case PACKET_RX:
       RAIL_RfIdle();
       RAIL_RxStart(channel);
       RTCDRV_StartTimer(slaveRtcId, rtcdrvTimerTypeOneshot, SLAVE_ON_TIME, slaveTimerExpiredCallback, NULL);
+      responsePrint("slave", "packet_rx:");//todo
       break;
     case PACKET_TX:
       generatePayload(&slaveTxData, slaveRxBlastId);
       RAIL_RfIdle();
       RAIL_TxDataLoad(&slaveTxData);
       RAIL_TxStart(channel, NULL, NULL);
+      responsePrint("slave", "packet_tx:");//todo
       break;
     case SLAVE_BLAST_RX:
       RAIL_RfIdle();
       RAIL_RxStart(channel);
       RTCDRV_StartTimer(slaveRtcId, rtcdrvTimerTypeOneshot, SLAVE_BLAST_RX_DELAY, slaveTimerExpiredCallback, NULL);
+      responsePrint("slave", "blast_rx:");//todo
       break;
     default:
     {
@@ -600,13 +679,17 @@ void slaveTimerExpiredCallback( RTCDRV_TimerID_t id, void *incomingPacket)
 {
   switch (appState) {
     case IDLE:  // set to RX mode, if we were in IDLE
+      responsePrint("slaveExpiredCallback", "idle:");//todo
       appState = PACKET_RX;
       break;
     case PACKET_RX: // set to IDLE, if we were in RX mode
+      responsePrint("slaveExpiredCallback", "packet_rx:");//todo
       appState = IDLE;
       break;
     case SLAVE_BLAST_RX: // blast RX finished, so wait a bit and then ACK
+      responsePrint("slaveExpiredCallback", "BLAST_rx:%ld",RAIL_GetTime());//todo
       RTCDRV_Delay(2 * SLAVE_BLAST_RX_DELAY);
+      responsePrint("slaveExpiredCallback", "BLAST_rx:%ld",RAIL_GetTime());//todo
       appState = PACKET_TX;
       break;
     default:
@@ -624,12 +707,14 @@ void RAILCb_TimerExpired (void)
   } else if (appMode == DUTY_CYCLE_MODE) {
     switch (appState) {
       case IDLE:  // set to RX mode, if we were in IDLE
+    	responsePrint("RAILCb_TimerExpired", "idle:");//todo
         appState = PACKET_RX;
         break;
       case PACKET_RX:   // set to IDLE, if we were in RX mode
       case PREAMBLE_RX: // set to IDLE, if we received a preamble but not sync
       case PACKET_TX:   // set to IDLE, if we were transmitting a packet
         appState = IDLE;
+        responsePrint("RAILCb_TimerExpired", "rx:");//todo
         break;
       default:
       {

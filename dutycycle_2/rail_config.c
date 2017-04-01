@@ -16,8 +16,7 @@
 //
 //=============================================================================
 #include "rail_config.h"
-
-
+#include "system.h"
 
 
 const uint32_t generated[] = {
@@ -33,7 +32,7 @@ const uint32_t generated[] = {
   0x00010030UL, 0x00000000UL,
   0x00010034UL, 0x00000000UL,
   0x0001003CUL, 0x00000000UL,
-  0x00010040UL, 0x00000700UL,
+  0x00010040UL, 0x00000704UL,
   0x00010048UL, 0x00000000UL,
   0x00010054UL, 0x00000000UL,
   0x00010058UL, 0x00000000UL,
@@ -41,9 +40,9 @@ const uint32_t generated[] = {
   0x000100A4UL, 0x00000000UL,
   0x000100A8UL, 0x00004DFFUL,
   0x000100ACUL, 0x00000000UL,
-  0x00012000UL, 0x00000744UL,
+  0x00012000UL, 0x000007A4UL,
   0x00012010UL, 0x00000000UL,
-  0x00012018UL, 0x0000A001UL,
+  0x00012018UL, 0x00008408UL,
   0x00013008UL, 0x0000AC3FUL,
   0x00013030UL, 0x00101555UL,
   0x00013034UL, 0x00000001UL,
@@ -56,7 +55,7 @@ const uint32_t generated[] = {
   0x00014144UL, 0x1153E6C1UL,
   0x00016014UL, 0x00000010UL,
   0x00016018UL, 0x04000000UL,
-  0x0001601CUL, 0x2E00000FUL,
+  0x0001601CUL, 0x2E00001FUL,
   0x00016020UL, 0x00003000UL,
   0x00016024UL, 0x000CD000UL,
   0x00016028UL, 0x03000000UL,
@@ -65,7 +64,7 @@ const uint32_t generated[] = {
   0x00016034UL, 0x00000AA8UL,
   0x00016038UL, 0x02120030UL,
   0x0001603CUL, 0x00320035UL,
-  0x00016040UL, 0x0000B16FUL,
+  0x00016040UL, 0xC44CB16FUL,
   0x00016044UL, 0x00000000UL,
   0x00016048UL, 0x17A00414UL,
   0x0001604CUL, 0x00000000UL,
@@ -92,6 +91,10 @@ const uint32_t generated[] = {
 const uint32_t *configList[] = {
   
   generated,
+  generated_100kbps,
+  generated_500kbps,
+  syncwordcnf,
+  lencnf
 };
 
 const char *configNames[] = {

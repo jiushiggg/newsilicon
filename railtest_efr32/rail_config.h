@@ -37,11 +37,11 @@ extern const RAIL_ChannelConfig_t generated_channelConfig;
 extern const RAIL_ChannelConfig_t *channelConfigs[];
 extern const RAIL_FrameType_t *frameTypeConfigList[];
 
-#define RADIO_CONFIG_BASE_FREQUENCY 2479000000UL
+#define RADIO_CONFIG_BASE_FREQUENCY 2401000000UL
 #define RADIO_CONFIG_XTAL_FREQUENCY 38400000UL
-#define RADIO_CONFIG_BITRATE "500kbps"
+#define RADIO_CONFIG_BITRATE "100kbps"
 #define RADIO_CONFIG_MODULATION_TYPE "FSK2"
-#define RADIO_CONFIG_DEVIATION "250.0kHz"
+#define RADIO_CONFIG_DEVIATION "185.0kHz"
 
 
 #endif // __RAIL_CONFIG_H__

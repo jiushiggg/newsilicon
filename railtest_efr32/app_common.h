@@ -96,8 +96,10 @@ extern void* txPreTxOpArgs;
 extern RAIL_TxOptions_t txOptions;
 // If this pointer is not NULL, call RAIL_TxStartWithOptions
 extern RAIL_TxOptions_t *txOptionsPtr;
-
-
+extern const uint32_t generated_500kbps[];
+extern const uint32_t generated_100kbps[];
+extern uint32_t syncwordcnf[];
+extern uint32_t lencnf[];
 /**
  * @enum AppMode
  * @brief Enumeration of RailTest transmit states.
@@ -121,6 +123,11 @@ typedef enum AppMode
   RX_SCHEDULED=14,/**< Enable receive at a time scheduled in the future */
 } AppMode_t;
 
+typedef enum{
+	BPS100,
+	BPS500,
+	BPSREMAIN,
+}bps_enum;
 
 AppMode_t previousAppMode(void);
 AppMode_t currentAppMode(void);

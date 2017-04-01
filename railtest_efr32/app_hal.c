@@ -165,6 +165,7 @@ void appHalInit(void)
   RETARGET_SerialInit();
   RETARGET_SerialCrLf(1);
 
+
   // Enable the buttons on the board
   for (int i=0; i<BSP_NO_OF_BUTTONS; i++)
   {
@@ -181,6 +182,7 @@ void appHalInit(void)
   GPIOINT_CallbackRegister(RETARGET_RXPIN, gpioCallback); // for 'sleep'
   GPIO_IntConfig(buttonArray[0].port, buttonArray[0].pin, true, true, true);
   GPIO_IntConfig(buttonArray[1].port, buttonArray[1].pin, true, true, true);
+
 }
 
 // Update any LCD text that should be changed
