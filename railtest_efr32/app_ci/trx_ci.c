@@ -152,7 +152,7 @@ void rxAt(int argc, char **argv)
   rxCfg.endMode = endMode;
   rxCfg.rxTransitionEndSchedule = rxTransitionEndSchedule;
   rxCfg.hardWindowEnd = hardEnd;
-  
+
   // Tell the app what we're doing so it can correctly track the end of the
   // scheduled receive state
   schRxStopOnRxEvent = rxTransitionEndSchedule;

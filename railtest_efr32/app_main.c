@@ -243,7 +243,7 @@ void myChangeRadioConfig(uint8_t channel, bps_enum bps, uint8_t* ID, uint8_t len
 {
 #define BASE_FREQ			2400000000
 #define CHANNEL_SPACING		500000
-	const uint32_t * p;
+	const uint32_t * p=NULL;
 
 	RAIL_RfIdle();
 	if (0xff == channel){
@@ -283,7 +283,7 @@ bpsconf:
 	lencnf[1] = len-1;
 	if (RAIL_RadioConfig((void*)configList[4])) { while(1); }
 }
-uint8_t ID[4] = {0X52, 0X56,0X78,0X54};
+uint8_t ID[4] = {0X53, 0X78,0X00,0X66};
 
 int main(void)
 {
@@ -313,13 +313,14 @@ int main(void)
 
   // Configure modem, packet handler
   changeRadioConfig(currentConfig);
-  myChangeRadioConfig(8, BPS500, ID, 16);
+  myChangeRadioConfig(150, BPS500, ID, 6);
   // Configure RAIL callbacks with no appended info
   RAIL_RxConfig((  RAIL_RX_CONFIG_FRAME_ERROR
                  | RAIL_RX_CONFIG_SYNC1_DETECT
                  | RAIL_RX_CONFIG_ADDRESS_FILTERED
                  | RAIL_RX_CONFIG_BUFFER_OVERFLOW
-                 | RAIL_RX_CONFIG_SCHEDULED_RX_END),
+                 | RAIL_RX_CONFIG_SCHEDULED_RX_END
+				 | RAIL_RX_CONFIG_TIMEOUT),
                 false);
 
   RAIL_SetRxTransitions(RAIL_RF_STATE_RX, RAIL_RF_STATE_RX,
@@ -373,100 +374,7 @@ int main(void)
   }
 } //main()
 
-/*
 
-int main(void)
-{
-
-  // Initialize the chip
-  CHIP_Init();
-
-  // Grab the reset cause
-  uint32_t resetCause = RMU_ResetCauseGet();
-  RMU_ResetCauseClear(); // So resetCause is rational and not an accmulated mess
-  // Release GPIOs that were held by EM4h
-  // This is reportedly a workaround that I've found needs to be done
-  // *before* appHalInit() tries to start oscillators, otherwise we'll
-  // hang indefinitely waiting for the oscillator to become ready.
-  if (resetCause & RMU_RSTCAUSE_EM4RST)
-  {
-    EMU->CMD = EMU_CMD_EM4UNLATCH;
-  }
-
-  // Initialize hardware for application
-  appHalInit();
-
-  // Initialize Radio
-  RAIL_RfInit(&railInitParams);
-
-  // Initialize Radio Calibrations
-  RAIL_CalInit(&railCalInitParams);
-
-  // Configure modem, packet handler
-  changeRadioConfig(currentConfig);
-
-  // Configure RAIL callbacks with no appended info
-  RAIL_RxConfig((  RAIL_RX_CONFIG_FRAME_ERROR
-                 | RAIL_RX_CONFIG_SYNC1_DETECT
-                 | RAIL_RX_CONFIG_ADDRESS_FILTERED
-                 | RAIL_RX_CONFIG_BUFFER_OVERFLOW
-                 | RAIL_RX_CONFIG_SCHEDULED_RX_END),
-                false);
-
-  RAIL_SetRxTransitions(RAIL_RF_STATE_RX, RAIL_RF_STATE_RX,
-                        RAIL_IGNORE_NO_ERRORS);
-  RAIL_SetTxTransitions(RAIL_RF_STATE_RX, RAIL_RF_STATE_RX);
-  // Initialize the queue we use for tracking packets
-  if (!queueInit(&rxPacketQueue, MAX_QUEUE_LENGTH)) { while(1); }
-
-  updateDisplay();
-
-  printf("\n"APP_DEMO_STRING_INIT"\n");
-  if (resetCause & RMU_RSTCAUSE_EM4RST)
-  {
-    responsePrint("sleepWoke", "EM:4%c,SerialWakeup:No,RfSensed:%s",
-                  (((EMU->EM4CTRL & EMU_EM4CTRL_EM4STATE)
-                    == EMU_EM4CTRL_EM4STATE_EM4S) ? 's' : 'h'),
-                  RAIL_RfSensed() ? "Yes" : "No");
-  }
-  printf("> ");
-  ciInitState(&state, ciBuffer, sizeof(ciBuffer), commands);
-
-  // Initialize autoack data
-  RAIL_AutoAckLoadBuffer(&ackPayload);
-
-  print_RAIL_status();
-
-  RAIL_RxStart(channel); // Start in receive mode
-
-  print_RAIL_status();
-
-  while(1)
-  {
-    processInputCharacters();
-
-    rfSensedCheck();
-
-    sendPacketIfPending();
-
-    finishTxSequenceIfPending();
-
-    changeAppModeIfPending();
-
-    printReceivedPacket();
-
-    printNewTxError();
-
-    checkTimerExpiration();
-
-//    updateDisplay();
-
-    processPendingCalibrations();
-
-    printAckTimeout();
-  }
-}
-*/
 /*
 int main(void)
 {
@@ -627,11 +535,13 @@ void RAILCb_RxRadioStatusExt(uint32_t status)
   {
     receivingPacket = true;
     counters.syncDetect++;
+    printf("rx_sync");
 	//todo
 //	print_RAIL_status("my_rec_status");
   }
   if (status & RAIL_RX_CONFIG_PREAMBLE_DETECT)
   {
+	printf("rx_preamble");
     counters.preambleDetect++;
   }
   if (status & RAIL_RX_CONFIG_BUFFER_OVERFLOW)
@@ -651,6 +561,10 @@ void RAILCb_RxRadioStatusExt(uint32_t status)
     {
       counters.rfSensedEvent = 1;
     }
+  }
+  if (status & RAIL_RX_CONFIG_TIMEOUT)
+  {
+	  printf("--timeout--");
   }
   // End scheduled receive mode if an appropriate end or error event is received
   if ((status & RAIL_RX_CONFIG_SCHEDULED_RX_END)

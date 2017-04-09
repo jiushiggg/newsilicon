@@ -166,6 +166,8 @@ void remote(void)
 	}
 }
 */
+
+
 void Delay_MS(UINT8 n)
 {
 	UINT8 i = 0;
@@ -484,6 +486,7 @@ static void value_init(void)
 	work_time = 2;						//开RX时间
 		
 	gwor_cnt = GROUP_WOR_MAX_VALUE;		//group wor 听帧计数
+	gsyscnf.set_wor_period = SET_WOR_PERIOD;
 	//lcd
 	screen_num = 0x01;
 	gbt_trigger = 0;

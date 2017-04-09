@@ -119,12 +119,12 @@ const RAIL_ChannelConfig_t *channelConfigs[] = {
   &generated_channelConfig,
 };
 
-
+//const RAIL_FrameType_t *frameTypeConfigList[] = {{0,0,0X1A,1,0}};
 
 const RAIL_FrameType_t *frameTypeConfigList[] = {
   NULL,
-
 };
+
 
 const uint8_t irCalConfig[] = {
   24, 0, 0, 6, 4, 16, 1, 0, 0, 1, 1, 6, 0, 16, 39, 0, 0, 5, 0, 1, 1, 0, 0, 0, 0

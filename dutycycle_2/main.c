@@ -26,6 +26,7 @@
 #include "bsp.h"
 #include "gpiointerrupt.h"
 #include "graphics.h"
+#include "udelay.h"
 
 #include "rail_config.h"
 
@@ -36,6 +37,8 @@
 #include "rf_protocol.h"
 #include "bank2.h"
 #include "system.h"
+#include "main.h"
+#include "crc.h"
 
 // Display buffer size
 #ifndef APP_DISPLAY_BUFFER_SIZE
@@ -97,16 +100,16 @@ char *appModeString[] =
 // Function prototypes
 static void changeRadioConfig(int newConfig);
 static void lcdPrintError(int errorCode);
-static void generatePayload(RAIL_TxData_t *txInfo, int txId);
+//static void generatePayload(RAIL_TxData_t *txInfo, int txId);
 void gpioCallback(uint8_t pin);
-static void serviceButtonPresses(void);
-static void switchAppMode(AppMode mode);
-static void switchDutyCycleAppState(void);
-static void switchMasterAppState(void);
-static void switchSlaveAppState(void);
+//static void serviceButtonPresses(void);
+//static void switchAppMode(AppMode mode);
+//static void switchDutyCycleAppState(void);
+//static void switchMasterAppState(void);
+//static void switchSlaveAppState(void);
 static void updateDisplay(void);
-void slaveTimerExpiredCallback( RTCDRV_TimerID_t id, void *incomingPacket);
-void myChangeRadioConfig(UINT8 channel, bps_enum bps, UINT8* ID, UINT8 len);
+//void slaveTimerExpiredCallback( RTCDRV_TimerID_t id, void *incomingPacket);
+
 
 /******************************************************************************
  * App constants and variables
@@ -129,13 +132,13 @@ static const RAIL_Init_t railInitParams = {
   APP_MAX_PACKET_LENGTH,
   RAIL_RF_XTAL_FREQ,
 };
-
+/*
 // Application payload data sent OTA with each transmission
 static uint8_t data[] = {
   0x0F, 0x16, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66,
   0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE,
 };
-
+*/
 /******************************************************************************
  * Duty Cycle mode constants and variables
  *****************************************************************************/
@@ -161,11 +164,12 @@ RAIL_TxData_t masterTxData;         // application payload sent during a TX
 /******************************************************************************
  * Slave mode constants and variables
  *****************************************************************************/
-
+/*
 #define SLAVE_ON_TIME         15    // time to stay on (ms)
 #define SLAVE_OFF_TIME        2500  // time to stay off (ms)
 #define SLAVE_BLAST_RX_DELAY  1000    // keep waiting for blast to end (ms)
-
+#define SLEEP_TIME  1000    // keep waiting for blast to end (ms)
+*/
 int slaveRxBlastId = 0;       // blast ID of the blast received
 int slaveRxBlastCount = 0;    // count of total blasts received
 RTCDRV_TimerID_t slaveRtcId;  // RTC timer ID
@@ -182,10 +186,75 @@ void set_iodebug(void)
 	setDebugSignal(3, para2);
 	setDebugSignal(3, para3);
 }
+void myChangeRadioConfig(uint8_t channel, bps_enum bps, uint8_t* ID, uint8_t len)
+{
+#define BASE_FREQ			2400000000
+#define CHANNEL_SPACING		500000
+	const uint32_t * p;
+
+	RAIL_RfIdle();
+	if (0xff == channel){
+		goto bpsconf;
+	}
+	//channel
+	if (0 == channel%2)
+	{
+		generated_channels[0].baseFrequency = BASE_FREQ + channel*CHANNEL_SPACING;
+	}
+	if (1 == channel%2)
+	{
+		generated_channels[0].baseFrequency += CHANNEL_SPACING;
+	}
+	RAIL_ChannelConfig(channelConfigs[0]); //channel
+
+bpsconf:
+	//bps
+	switch(bps){
+		case TX_BPS: p = configList[1];
+			break;
+		case RX_BPS: p = configList[2];
+			break;
+		default:p = NULL;
+			break;
+	}
+	if (RAIL_RadioConfig((void*)p)) { while(1); }
+
+	//ID
+	if (NULL != ID)
+	{
+		syncwordcnf[1] = change_syncword((uint32_t)ID[0]<<24|(uint32_t)ID[1]<<16|(uint32_t)ID[2]<<8 | (uint32_t)ID[3]);
+		if (RAIL_RadioConfig((void*)configList[3])) { while(1); }
+	}
+
+	//len
+	lencnf[1] = len-1;
+	if (RAIL_RadioConfig((void*)configList[4])) { while(1); }
+}
+void test_id(void)
+{
+
+	const UINT8 id2[]={0X53,0X78,0x00,0X66, 0X58,0X48,0X22,0X99,  0x52,0x56,0x78,0x53,150, 34, 150,150};
+    memcpy((UINT8 *)&gRFInitData, (UINT8 *)&id2, sizeof(id2));
+  	grf.crc = my_cal_crc16(0,(UINT8 *)&gRFInitData,sizeof(RFINIT));
+}
+void rail_status(char * data)
+{
+	uint8_t a = RAIL_RfStateGet();
+	if (0==a){
+		//printf("i");
+		responsePrint(data, "idle:");
+	}else if(1==a){
+		responsePrint(data, "rec:");
+	}else if(2==a){
+		responsePrint(data, "send:");
+	}else{
+		responsePrint(data, "un:");
+	}
+}
 /******************************************************************************
  * App main
  *****************************************************************************/
-uint8_t ID[] ={0X52,0X56,0X78,0X53};
+uint8_t ID[] ={0X53,0X78,0X00,0X66};
 int main(void)
 {
   // Initialize the chip
@@ -223,7 +292,7 @@ int main(void)
   // Configure modem, packet handler
   changeRadioConfig(currentConfig);
 
-  myChangeRadioConfig(8, BPS100, ID, 16);
+  myChangeRadioConfig(8, TX_BPS, ID, 16);
   // Configure RAIL callbacks with no appended info
   RAIL_RxConfig((  RAIL_RX_CONFIG_PREAMBLE_DETECT
                  | RAIL_RX_CONFIG_INVALID_CRC
@@ -231,20 +300,43 @@ int main(void)
                  | RAIL_RX_CONFIG_ADDRESS_FILTERED
                  | RAIL_RX_CONFIG_BUFFER_OVERFLOW  ),
                 false);
+  RAIL_SetRxTransitions(RAIL_RF_STATE_RX, RAIL_RF_STATE_RX,
+                        RAIL_IGNORE_NO_ERRORS);
 
   set_iodebug();
   updateDisplay();
-  /*
+  BSP_LedsInit();
+
+  RTCDRV_Init();
+  RTCDRV_AllocateTimer( &slaveRtcId ); // Reserve a timer
+//  RTCDRV_IsRunning(slaveRtcId, &slaveRtcRunning);
+//  if (slaveRtcRunning) {
+//    RTCDRV_StopTimer(slaveRtcId);
+ // }
+  RTCDRV_StartTimer(slaveRtcId, rtcdrvTimerTypePeriodic, SLAVE_OFF_TIME, slaveTimerExpiredCallback, NULL);
+  System_Init();
+  test_id();
+  gRF_mode.next_st = RF_ST_SET_WOR;
   while(1)
   {
-		if(gEventFlag&EVENT_FLAG_RFDATA)
-		{
-			gEventFlag ^= EVENT_FLAG_RFDATA;
-//			rf_fsm();
+//todo
+		while(0 != gEventFlag){
+			if(gEventFlag&EVENT_FLAG_RFDATA)
+			{
+				gEventFlag ^= EVENT_FLAG_RFDATA;
+				rf_fsm();
+			}
+		}
+
+
+		while(gEventFlag == 0){
+
+		  EMU_EnterEM2(true);
+		  UDELAY_Delay(1000);
 		}
 
   }
-  */
+/*
 
   while(1) {
     // process button press behavior
@@ -257,7 +349,7 @@ int main(void)
         || forceStateChange) {
       forceStateChange = false;
       if (appMode == DUTY_CYCLE_MODE) {
-    	responsePrint("duty", "duty idle:");//todo
+    	responsePrint("duty", "duty idle:");//
         switchDutyCycleAppState();
       } else if (appMode == SLAVE_MODE) {
         switchSlaveAppState();
@@ -266,7 +358,7 @@ int main(void)
       }
     }
   }
-
+*/
 }
 
 /******************************************************************************
@@ -301,50 +393,6 @@ static void changeRadioConfig(int newConfig)
   currentConfig = newConfig;
 }
 
-void myChangeRadioConfig(uint8_t channel, bps_enum bps, uint8_t* ID, uint8_t len)
-{
-#define BASE_FREQ			2400000000
-#define CHANNEL_SPACING		500000
-	const uint32_t * p;
-
-	RAIL_RfIdle();
-	if (0xff == channel){
-		goto bpsconf;
-	}
-	//channel
-	if (0 == channel%2)
-	{
-		generated_channels[0].baseFrequency = BASE_FREQ + channel*CHANNEL_SPACING;
-	}
-	if (1 == channel%2)
-	{
-		generated_channels[0].baseFrequency += CHANNEL_SPACING;
-	}
-	RAIL_ChannelConfig(channelConfigs[0]); //channel
-
-bpsconf:
-	//bps
-	switch(bps){
-		case BPS100: p = configList[1];
-			break;
-		case BPS500: p = configList[2];
-			break;
-		default:
-			break;
-	}
-	if (RAIL_RadioConfig((void*)p)) { while(1); }
-
-	//ID
-	if (NULL != ID)
-	{
-		syncwordcnf[1] = change_syncword((uint32_t)ID[0]<<24|(uint32_t)ID[1]<<16|(uint32_t)ID[2]<<8 | (uint32_t)ID[3]);
-		if (RAIL_RadioConfig((void*)configList[3])) { while(1); }
-	}
-
-	//len
-	lencnf[1] = len-1;
-	if (RAIL_RadioConfig((void*)configList[4])) { while(1); }
-}
 
 /**************************************************************************//**
  * @brief   A function for managing what is shown on the LCD display in an
@@ -374,13 +422,14 @@ static void lcdPrintError(int errorCode)
  * defined above.
  * @param[in] txId  The ID to put in the first element of the packet.
  *****************************************************************************/
+/*
 static void generatePayload(RAIL_TxData_t *txInfo, int txId)
 {
   data[0] = txId;
   txInfo->dataPtr = (uint8_t *)&data[0];
   txInfo->dataLength = sizeof(data);
 }
-
+*/
 /**************************************************************************//**
  * @brief   A callback to handle a button press on the WSTK
  *
@@ -407,6 +456,7 @@ void gpioCallback(uint8_t pin)
  * @brief  A function for handling button presses outside of interrupt
  *         context.
  *****************************************************************************/
+/*
 static void serviceButtonPresses(void)
 {
   INT_Disable(); // Disable interrupts so we can't be whacked while processing
@@ -451,10 +501,11 @@ static void serviceButtonPresses(void)
   }
   INT_Enable(); // Re-enable interrupts when we are done
 }
-
+*/
 /**************************************************************************//**
  * @brief   Function to switch application mode
  *****************************************************************************/
+/*
 static void switchAppMode(AppMode mode)
 {
   if (mode == SLAVE_MODE) {
@@ -479,10 +530,11 @@ static void switchAppMode(AppMode mode)
 
   updateDisplay();
 }
-
+*/
 /**************************************************************************//**
  * @brief   Function to switch application state in Duty Cycle mode
  *****************************************************************************/
+/*
 static void switchDutyCycleAppState(void)
 {
   previousAppState = appState;
@@ -496,29 +548,29 @@ static void switchDutyCycleAppState(void)
     case IDLE:
       RAIL_TimerSet(DUTY_CYCLE_OFF_TIME, RAIL_TIME_DELAY);
       RAIL_RfIdle();
-      responsePrint("duty", "duty idle:");//todo
+      responsePrint("duty", "duty idle:");//
       EMU_EnterEM1();
       break;
     case PREAMBLE_RX:
       RAIL_TimerSet(DUTY_CYCLE_PREAMBLE_ON_TIME, RAIL_TIME_DELAY);
-      responsePrint("duty", "preamble_rx:");//todo
+      responsePrint("duty", "preamble_rx:");//
       break;
     case SYNC_RX:
       // do nothing.. just wait.
-      responsePrint("duty", "sync_rx:");//todo
+      responsePrint("duty", "sync_rx:");//
       break;
     case PACKET_RX:
       RAIL_RfIdle();
       RAIL_RxStart(channel);
       RAIL_TimerSet(DUTY_CYCLE_ON_TIME, RAIL_TIME_DELAY);
-      responsePrint("duty", "packet_rx:");//todo
+      responsePrint("duty", "packet_rx:");//
       break;
     case PACKET_TX:
       generatePayload(&dutyCycleTxData, 0);
       RAIL_RfIdle();
       RAIL_TxDataLoad(&dutyCycleTxData);
       RAIL_TxStart(channel, NULL, NULL);
-      responsePrint("duty", "packet_tx:");//todo
+      responsePrint("duty", "packet_tx:");//
       break;
     default:
     {
@@ -527,10 +579,11 @@ static void switchDutyCycleAppState(void)
     }
   }
 }
-
+*/
 /**************************************************************************//**
  * @brief   Function to switch application state in Master mode
  *****************************************************************************/
+/*
 static void switchMasterAppState(void)
 {
   previousAppState = appState;
@@ -543,19 +596,19 @@ static void switchMasterAppState(void)
   switch (appState) {
     case IDLE:
       RAIL_RfIdle();
-      responsePrint("master", "idle:");//todo
+      responsePrint("master", "idle:");//
       break;
     case PACKET_RX:
       RAIL_TimerSet(MASTER_ACK_WAITING_TIME, RAIL_TIME_DELAY);
       RAIL_RfIdle();
       RAIL_RxStart(channel);
-      responsePrint("master", "packet_rx:");//todo
+      responsePrint("master", "packet_rx:");//
       break;
     case MASTER_BLAST_TX:
       generatePayload(&masterTxData, masterTxBlastId);
       RAIL_TxDataLoad(&masterTxData);
       RAIL_TxStart(channel, NULL, NULL);
-      responsePrint("master", "blast_tx:");//todo
+      responsePrint("master", "blast_tx:");//
       break;
     default:
     {
@@ -566,10 +619,11 @@ static void switchMasterAppState(void)
 
   updateDisplay();
 }
-
+*/
 /**************************************************************************//**
  * @brief   Function to switch application state in Slave mode
  *****************************************************************************/
+/*
 static void switchSlaveAppState(void)
 {
   previousAppState = appState;
@@ -585,26 +639,26 @@ static void switchSlaveAppState(void)
       RTCDRV_StartTimer(slaveRtcId, rtcdrvTimerTypeOneshot, SLAVE_OFF_TIME, slaveTimerExpiredCallback, NULL);
       RAIL_RfIdle();
       EMU_EnterEM2(true);
-      responsePrint("slave", "idle:");//todo
+      responsePrint("slave", "idle:");//
       break;
     case PACKET_RX:
       RAIL_RfIdle();
       RAIL_RxStart(channel);
       RTCDRV_StartTimer(slaveRtcId, rtcdrvTimerTypeOneshot, SLAVE_ON_TIME, slaveTimerExpiredCallback, NULL);
-      responsePrint("slave", "packet_rx:");//todo
+      responsePrint("slave", "packet_rx:");//
       break;
     case PACKET_TX:
       generatePayload(&slaveTxData, slaveRxBlastId);
       RAIL_RfIdle();
       RAIL_TxDataLoad(&slaveTxData);
       RAIL_TxStart(channel, NULL, NULL);
-      responsePrint("slave", "packet_tx:");//todo
+      responsePrint("slave", "packet_tx:");//
       break;
     case SLAVE_BLAST_RX:
       RAIL_RfIdle();
       RAIL_RxStart(channel);
       RTCDRV_StartTimer(slaveRtcId, rtcdrvTimerTypeOneshot, SLAVE_BLAST_RX_DELAY, slaveTimerExpiredCallback, NULL);
-      responsePrint("slave", "blast_rx:");//todo
+      responsePrint("slave", "blast_rx:");//
       break;
     default:
     {
@@ -615,7 +669,7 @@ static void switchSlaveAppState(void)
 
   updateDisplay();
 }
-
+*/
 /**************************************************************************//**
  * @brief   A function for managing what is shown on the LCD display under
  *          normal conditions.
@@ -677,19 +731,18 @@ static void updateDisplay(void)
 
 void slaveTimerExpiredCallback( RTCDRV_TimerID_t id, void *incomingPacket)
 {
+	/*
   switch (appState) {
     case IDLE:  // set to RX mode, if we were in IDLE
-      responsePrint("slaveExpiredCallback", "idle:");//todo
+      responsePrint("slaveExpiredCallback", "idle:");//
       appState = PACKET_RX;
       break;
     case PACKET_RX: // set to IDLE, if we were in RX mode
-      responsePrint("slaveExpiredCallback", "packet_rx:");//todo
+      responsePrint("slaveExpiredCallback", "packet_rx:");//
       appState = IDLE;
       break;
     case SLAVE_BLAST_RX: // blast RX finished, so wait a bit and then ACK
-      responsePrint("slaveExpiredCallback", "BLAST_rx:%ld",RAIL_GetTime());//todo
       RTCDRV_Delay(2 * SLAVE_BLAST_RX_DELAY);
-      responsePrint("slaveExpiredCallback", "BLAST_rx:%ld",RAIL_GetTime());//todo
       appState = PACKET_TX;
       break;
     default:
@@ -698,8 +751,10 @@ void slaveTimerExpiredCallback( RTCDRV_TimerID_t id, void *incomingPacket)
       while(1); //should never get here
     }
   }
+  */
+	gEventFlag |= EVENT_FLAG_RFDATA;
 }
-
+/*
 void RAILCb_TimerExpired (void)
 {
   if (appMode == MASTER_MODE) {
@@ -707,14 +762,14 @@ void RAILCb_TimerExpired (void)
   } else if (appMode == DUTY_CYCLE_MODE) {
     switch (appState) {
       case IDLE:  // set to RX mode, if we were in IDLE
-    	responsePrint("RAILCb_TimerExpired", "idle:");//todo
+    	responsePrint("RAILCb_TimerExpired", "idle:");//
         appState = PACKET_RX;
         break;
       case PACKET_RX:   // set to IDLE, if we were in RX mode
       case PREAMBLE_RX: // set to IDLE, if we received a preamble but not sync
       case PACKET_TX:   // set to IDLE, if we were transmitting a packet
         appState = IDLE;
-        responsePrint("RAILCb_TimerExpired", "rx:");//todo
+        responsePrint("RAILCb_TimerExpired", "rx:");//
         break;
       default:
       {
@@ -724,7 +779,7 @@ void RAILCb_TimerExpired (void)
     }
   }
 }
-
+*/
 void RAILCb_TxPacketSent(RAIL_TxPacketInfo_t *txPacketInfo)
 {
   if (appMode == DUTY_CYCLE_MODE) {
@@ -766,11 +821,9 @@ void RAILCb_TxRadioStatus(uint8_t status)
     }
   }
 }
-
+/*
 void RAILCb_RxPacketReceived(void *rxPacketHandle)
 {
-  RAIL_RxPacketInfo_t* rxPacketInfo = rxPacketHandle;
-
   if (appMode == DUTY_CYCLE_MODE) {
     // set back to idle and update display
     packetReceived++;
@@ -793,7 +846,7 @@ void RAILCb_RxPacketReceived(void *rxPacketHandle)
     forceStateChange = true;
   }
 }
-
+*///todo
 void RAILCb_RxRadioStatus(uint8_t status)
 {
   if (appMode == DUTY_CYCLE_MODE) {
@@ -823,7 +876,7 @@ void RAILCb_RxRadioStatus(uint8_t status)
     }
   } else if (appMode == SLAVE_MODE) {
     // continue listening for more packets in blast
-    RTCDRV_StopTimer(slaveRtcId);
+//    RTCDRV_StopTimer(slaveRtcId);
     appState = SLAVE_BLAST_RX;
     forceStateChange = true;
   }

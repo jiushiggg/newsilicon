@@ -3,7 +3,7 @@
 
 #define GROUP_WOR_MAX_VALUE  (UINT8)30
 #define HB_PERIOD				90
-#define SET_WOR_PERIOD			24	
+#define SET_WOR_PERIOD			4
 #define GROUP_WOR_PERIOD		2
 
 void rf_fsm(void);

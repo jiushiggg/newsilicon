@@ -72,6 +72,7 @@ typedef enum {
 	RF_ST_SET_IDLE = 0X01,	
 	RF_ST_SET_WOR = 0X02,  
 	RF_ST_GROUP_SLEEP = 0X04,			//10
+	RF_ST_RECEIVING = 0X06,			//10
 	RF_ST_GROUP_WKUP = 0X08,
 	RF_ST_GROUP_TRANSFER = 0X10,
 
@@ -347,9 +348,9 @@ typedef struct{
 
 
 typedef enum{
-	BPS100,
-	BPS500,
-	BPSREMAIN
+	TX_BPS,
+	RX_BPS,
+	DEFAULT_BPS
 }bps_enum;
 
 #define TRUE 1

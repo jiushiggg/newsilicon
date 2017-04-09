@@ -97,6 +97,8 @@
 #define END_ADDR 		0XFF
 #define _CLRWDT
 
+#define LCD_213
+
 
 extern const UINT32 generated_500kbps[];
 extern const UINT32 generated_100kbps[];
@@ -117,7 +119,7 @@ void eeprom(void);
 void remote(void);
 UINT8 hb_setwor_fun(void);
 UINT32 change_syncword(UINT32 souce);
-
+void myChangeRadioConfig(UINT8 channel, bps_enum bps, UINT8* ID, UINT8 len);
 
 #endif
 
