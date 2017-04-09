@@ -174,17 +174,19 @@ extern bool slaveRtcRunning;         // boolean for RTC status
 
 RAIL_AppendedInfo_t appendedInfo;
 uint8_t received_data = false;
-uint8_t received_tmout = false;
+volatile uint8_t received_tmout = 0;
+
 RF_ERROR_T myret = 0;
 
 void RAILCb_RxPacketReceived(void *rxPacketHandle)
 {
   RAIL_RxPacketInfo_t* rxPacketInfo = rxPacketHandle;
 //  uint8_t len = sizeof(RAIL_AppendedInfo_t)+sizeof(rxPacketInfo->dataLength)+rxPacketInfo->dataLength;
-  memcpy((uint8_t*)&appendedInfo, (uint8_t*)&rxPacketInfo->appendedInfo, sizeof(RAIL_AppendedInfo_t));
+  memcpy((uint8_t*)&appendedInfo.timeUs, (uint8_t*)&rxPacketInfo->appendedInfo.timeUs, sizeof(RAIL_AppendedInfo_t));
   memcpy(gRFbuf.buff , rxPacketInfo->dataPtr, sizeof(gRFbuf.buff));
   received_data = true;
 }
+
 void RAILCb_TimerExpired (void)	//todo
 {
 	received_tmout = true;
@@ -472,7 +474,7 @@ static void st_RF_init(void)
 static RF_ERROR_T st_set_wor(void)//todo
 {
 	RFID buff;	
-//	RF_ERROR_T ret = RF_ERROR_NONE;
+	RF_ERROR_T ret = RF_ERROR_UNKNOWN;
 //	ISR_set_timer_ccrp(FALSE, 0, LIRC_2S);			//¹Ø±ÕT2 CCRP
 	RTCDRV_IsRunning(slaveRtcId, &slaveRtcRunning);
 	if (slaveRtcRunning) {
@@ -492,40 +494,36 @@ static RF_ERROR_T st_set_wor(void)//todo
 //	ret = rf_wor_receive((UINT8*)&gRFbuf.swp, sizeof(gRFbuf.swp));
 //	T0_RX_3MS_OFF;
 //	grx3ms_overflow = FALSE;
-	myret = RF_ERROR_RX_TIMEOUT;
-	if (RAIL_TimerIsRunning()) {
-		RAIL_TimerCancel();
-	}
+
+//	if (RAIL_TimerIsRunning()) {
+//		RAIL_TimerCancel();
+//	}
 	RAIL_RfIdle();
-	received_tmout = sizeof(gRFbuf.swp);
-	myChangeRadioConfig(gRFInitData.set_wkup_ch, RX_BPS, (UINT8*)&buff.ID, 6);
+	myChangeRadioConfig(gRFInitData.set_wkup_ch, RX_BPS, (UINT8*)&buff.ID, sizeof(gRFbuf.swp));
+	memset(gRFbuf.buff , 0, sizeof(gRFbuf.buff));
 	received_data = false;
 	received_tmout = false;
-//	UDELAY_Delay(1000);
 	rail_status("a");
-	RAIL_RxStart(0);
+//	RAIL_RxStart(0);
 	RAIL_TimerSet(SET_WOR_REC_TIME, RAIL_TIME_DELAY);
 	do{
+		RAIL_RxStart(0);
 		while (false == RAIL_TimerExpired()  && false==received_data);
 		if (true == received_tmout){
-			myret |= RF_ERROR_RX_TIMEOUT;
+			ret |= RF_ERROR_RX_TIMEOUT;
 			RAIL_RfIdle();
-//			UDELAY_Delay(1000);
-//			UDELAY_Delay(1000);
 //			UDELAY_Delay(1000);
 			rail_status("b");
 			break;
 		}
 		if (1 == appendedInfo.crcStatus){
-			RAIL_TimerCancel();
-			myret = RF_ERROR_NONE;
+			ret = RF_ERROR_NONE;
 			break;
 		}else {
-			RAIL_RxStart(0);
-			myret |= RF_ERROR_RF_CRC;
+			ret |= RF_ERROR_RF_CRC;
 		}
 	}while(false == RAIL_TimerExpired());
-
+	RAIL_TimerCancel();
 	switch(gRFbuf.buff[0]&0XE0){
 		case LINK_CTRL_GLB:
 		case LINK_CTRL_JUMP_GROUP1:
@@ -533,10 +531,10 @@ static RF_ERROR_T st_set_wor(void)//todo
 		case LINK_CTRL_SET_WK:
 			break;
 		default:
-			myret |= RF_ERROR_UNKNOWN;
+			ret |= RF_ERROR_UNKNOWN;
 			break;
 	}	
-	return myret;
+	return ret;
 }
 
 static RF_ERROR_T st_group_WOR(void)
@@ -553,27 +551,36 @@ static RF_ERROR_T st_group_WOR(void)
 	//	ret = rf_wor_receive((UINT8*)&gRFbuf.gwp0, sizeof(gRFbuf.gwp0));
 	//	T0_RX_3MS_OFF;
 	//	grx3ms_overflow = FALSE;
-	myret = RF_ERROR_RX_TIMEOUT;
+	RF_ERROR_T ret = RF_ERROR_UNKNOWN;
 	if (RAIL_TimerIsRunning()) {
 		RAIL_TimerCancel();
 	}
 	RAIL_RfIdle();
 	myChangeRadioConfig(gRFInitData.grp_wkup_ch, RX_BPS, (uint8_t*)&gRFInitData.grp_wkup_id, sizeof(gRFbuf.gwp0));
+	memset(gRFbuf.buff , 0, sizeof(gRFbuf.buff));
 	received_data = false;
-//	received_tmout = false;
-	RAIL_RxStart(0);
+	received_tmout = false;
+	rail_status("a");
+//	RAIL_RxStart(0);
 	RAIL_TimerSet(SET_WOR_REC_TIME, RAIL_TIME_DELAY);
 	do{
+		RAIL_RxStart(0);
 		while (false == RAIL_TimerExpired()  && false==received_data);
+		if (true == received_tmout){
+			ret |= RF_ERROR_RX_TIMEOUT;
+			RAIL_RfIdle();
+//			UDELAY_Delay(1000);
+			rail_status("b");
+			break;
+		}
 		if (1 == appendedInfo.crcStatus){
-			RAIL_TimerCancel();
-			myret = RF_ERROR_NONE;
+			ret = RF_ERROR_NONE;
 			break;
 		}else {
-			RAIL_RxStart(0);
-			myret |= RF_ERROR_RF_CRC;
+			ret |= RF_ERROR_RF_CRC;
 		}
 	}while(false == RAIL_TimerExpired());
+	RAIL_TimerCancel();
 
 	return myret;
 }

@@ -255,6 +255,7 @@ void rail_status(char * data)
  * App main
  *****************************************************************************/
 uint8_t ID[] ={0X53,0X78,0X00,0X66};
+volatile uint8_t a = 0;
 int main(void)
 {
   // Initialize the chip
@@ -300,7 +301,7 @@ int main(void)
                  | RAIL_RX_CONFIG_ADDRESS_FILTERED
                  | RAIL_RX_CONFIG_BUFFER_OVERFLOW  ),
                 false);
-  RAIL_SetRxTransitions(RAIL_RF_STATE_RX, RAIL_RF_STATE_RX,
+  RAIL_SetRxTransitions(RAIL_RF_STATE_IDLE, RAIL_RF_STATE_RX, //RAIL_RF_STATE_IDLE
                         RAIL_IGNORE_NO_ERRORS);
 
   set_iodebug();
@@ -849,7 +850,7 @@ void RAILCb_RxPacketReceived(void *rxPacketHandle)
 *///todo
 void RAILCb_RxRadioStatus(uint8_t status)
 {
-  if (appMode == DUTY_CYCLE_MODE) {
+//  if (appMode == DUTY_CYCLE_MODE) {
     // if preamble detected, continue listening for sync
     if (status & RAIL_RX_CONFIG_PREAMBLE_DETECT) {
       forceStateChange = true;
@@ -867,19 +868,6 @@ void RAILCb_RxRadioStatus(uint8_t status)
         || (status & RAIL_RX_CONFIG_ADDRESS_FILTERED)) {
       appState = IDLE;
     }
-  } else if (appMode == MASTER_MODE) {
-    // ACK failed, set back to IDLE
-    if ((status & RAIL_RX_CONFIG_INVALID_CRC)
-        || (status & RAIL_RX_CONFIG_BUFFER_OVERFLOW)
-        || (status & RAIL_RX_CONFIG_ADDRESS_FILTERED)) {
-      appState = IDLE;
-    }
-  } else if (appMode == SLAVE_MODE) {
-    // continue listening for more packets in blast
-//    RTCDRV_StopTimer(slaveRtcId);
-    appState = SLAVE_BLAST_RX;
-    forceStateChange = true;
-  }
 }
 
 void *RAILCb_AllocateMemory(uint32_t size)

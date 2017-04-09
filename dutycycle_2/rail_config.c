@@ -19,6 +19,7 @@
 #include "system.h"
 
 
+
 const uint32_t generated[] = {
   0x01010FF4UL, 0x00000000UL,
   0x01010FF8UL, 0x0003C002UL,
@@ -41,7 +42,7 @@ const uint32_t generated[] = {
   0x000100A8UL, 0x00004DFFUL,
   0x000100ACUL, 0x00000000UL,
   0x00012000UL, 0x000007A4UL,
-  0x00012010UL, 0x00000000UL,
+  0x00012010UL, 0x0000F0B8UL,
   0x00012018UL, 0x00008408UL,
   0x00013008UL, 0x0000AC3FUL,
   0x00013030UL, 0x00101555UL,
@@ -63,10 +64,10 @@ const uint32_t generated[] = {
   0x00016030UL, 0x00FF7C83UL,
   0x00016034UL, 0x00000AA8UL,
   0x00016038UL, 0x02120030UL,
-  0x0001603CUL, 0x00320035UL,
+  0x0001603CUL, 0x00100012UL,
   0x00016040UL, 0xC44CB16FUL,
   0x00016044UL, 0x00000000UL,
-  0x00016048UL, 0x17A00414UL,
+  0x00016048UL, 0x1DE00714UL,
   0x0001604CUL, 0x00000000UL,
   0x00016050UL, 0x00360395UL,
   0x00016054UL, 0x00000000UL,
@@ -119,12 +120,12 @@ const RAIL_ChannelConfig_t *channelConfigs[] = {
   &generated_channelConfig,
 };
 
-//const RAIL_FrameType_t *frameTypeConfigList[] = {{0,0,0X1A,1,0}};
+
 
 const RAIL_FrameType_t *frameTypeConfigList[] = {
   NULL,
-};
 
+};
 
 const uint8_t irCalConfig[] = {
   24, 0, 0, 6, 4, 16, 1, 0, 0, 1, 1, 6, 0, 16, 39, 0, 0, 5, 0, 1, 1, 0, 0, 0, 0
