@@ -1,0 +1,37 @@
+// Copyright 2017 Silicon Laboratories, Inc.
+//
+//
+
+
+API version: 1.11.1
+
+- Informational data:
+Preamble Binary Pattern = 01010101010101010101010101010101 
+Sync Word Binary Pattern = 11110110100011010011001000100011 
+Calculated Actual Bandwidth = 673280 
+Calculated baudrate = 100000 
+
+- Calculated and corrected values:
+Timing Detection Threshold = 20 
+Timing Samples Threshold = 12 
+AFC Frequency Limit = 45000 Hz
+Channel Bandwidth = 666000 Hz
+IF Frequency = 800000 Hz
+PLL Bandwidth = 8 
+Number of Symbols in Timing Window = 14 
+Number of Errors Allowed in a Timing Window = 0 
+Number of Timing Windows to Detect = 1 
+Signal Quality Indicator Threshold = 0 
+Timing Resync Period = 0 
+Frequency Offset Period = 0 
+AGC Power Target = -8 dBm
+RSSI Update Period = 0 
+AGC Hysteresis = 0 dB
+AGC Settling Delay = 39 
+AFC Step Scale = 0.0 
+AGC Period = 0 
+RX Baudrate offset = 0 Hz
+AGC Speed = 1 
+Frequency Compensation Mode = 0 
+Preamble on the air: 01010101010101010101010101010101
+Syncword 0 on the air: 11110110100011010011001000100011

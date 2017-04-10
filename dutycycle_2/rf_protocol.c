@@ -5,6 +5,7 @@
 #include "rail_types.h"
 #include "em_int.h"
 #include "rtcdriver.h"
+#include "bsp.h"
 
 #include "system.h"
 #include "crc.h"
@@ -165,7 +166,7 @@ static BOOL rf_loop_condition(void);
 void data_layer_cmd(stRecvBuff *p);
 
 static RF_ERROR_T st_remote_wor(void);
-static RF_ERROR_T a7106_tx_data(RFID id, UINT8 len, UINT8 *buf,UINT16 kbps);
+static UINT8 a7106_tx_data(RFID id, UINT8 len, UINT8 *buf,bps_enum kbps);
 //extern BOOL EEPROM_Read(UINT8 addr, UINT8* dst, UINT8 n);
 //extern void led_map(void);
 extern void myChangeRadioConfig(uint8_t channel, bps_enum bps, uint8_t* ID, uint8_t len);
@@ -187,7 +188,7 @@ void RAILCb_RxPacketReceived(void *rxPacketHandle)
   received_data = true;
 }
 
-void RAILCb_TimerExpired (void)	//todo
+void RAILCb_TimerExpired (void)	//
 {
 	received_tmout = true;
 }
@@ -296,7 +297,9 @@ static void st_sleep(void)
 	if (gsolt > 5){
 		gsolt -= 5;
 	}
+	BSP_LedToggle(0);
 	wakeup_wait(gsolt);
+	BSP_LedToggle(0);
 }
 /*
 static RF_ERROR_T rf_wor_receive(UINT8 *buff, UINT8 len)
@@ -370,33 +373,51 @@ static RF_ERROR_T rf_receive(void)
 	
 	return ret;
 	*/
+
+	/*
+	RAIL_RfIdle();
+	myChangeRadioConfig(gRFInitData.set_wkup_ch, RX_BPS, (UINT8*)&id.ID, sizeof(stRecvBuff));
+	rail_status("a");
+//	RAIL_RxStart(0);
+	*/
+	RF_ERROR_T ret = RF_ERROR_UNKNOWN;
 	UINT16 tmp = 0;
+	memset(gRFbuf.buff , 0, sizeof(gRFbuf.buff));
+	memset((uint8_t*)&appendedInfo.timeUs, 0, sizeof(RAIL_AppendedInfo_t));
+	received_data = false;
+	received_tmout = false;
 	do{
+		RAIL_RxStart(0);
 		while (false == RAIL_TimerExpired()  && false==received_data);
-		if (0 == appendedInfo.crcStatus){
-			RAIL_RxStart(0);
-			myret |= RF_ERROR_RF_CRC;
-			continue;
-		}else {
-			if (DATA_CTRL_GRP_PKG1 == (gRFbuf.buff[0]&0xe0)){
-				tmp = my_cal_crc16(0, (UINT8 *)&gRFbuf.buff[0], sizeof(gRFbuf.buff)-2);
-				tmp = my_cal_crc16(tmp, (UINT8 *)&gRFInitData.grp_wkup_id, 4);
-			}else{
-				tmp = my_cal_crc16(0, (UINT8 *)&gRFbuf.buff[0], sizeof(gRFbuf.buff)-2);
-				tmp = my_cal_crc16(tmp, (UINT8 *)&gRFInitData.esl_id, 4);
-			}
-			if (gRFbuf.gwp1.crc != tmp) {
-				RAIL_RxStart(0);
-				gRF_mode.error |= RF_ERROR_SW_CRC;
-				continue;								//软件CRC错误
-			}
-			RAIL_TimerCancel();
-			gRF_mode.error = RF_ERROR_NONE;
+		if (true == received_tmout){
+			ret |= RF_ERROR_RX_TIMEOUT;
+			RAIL_RfIdle();
+//			UDELAY_Delay(1000);
+//			rail_status("b");
 			break;
 		}
+		if (0 == appendedInfo.crcStatus){
+			ret |= RF_ERROR_RF_CRC;
+			continue;
+		}
+		if (DATA_CTRL_GRP_PKG1 == (gRFbuf.buff[0]&0xe0)){
+			tmp = my_cal_crc16(0, (UINT8 *)&gRFbuf.buff[0], sizeof(gRFbuf.buff)-2);
+			tmp = my_cal_crc16(tmp, (UINT8 *)&gRFInitData.grp_wkup_id, 4);
+		}else{
+			tmp = my_cal_crc16(0, (UINT8 *)&gRFbuf.buff[0], sizeof(gRFbuf.buff)-2);
+			tmp = my_cal_crc16(tmp, (UINT8 *)&gRFInitData.esl_id, 4);
+		}
+		if (gRFbuf.gwp1.crc != tmp) {
+			gRF_mode.error |= RF_ERROR_SW_CRC;
+			ret = RF_ERROR_SW_CRC;
+			continue;								//软件CRC错误
+		}
+		gRF_mode.error = RF_ERROR_NONE;
+		ret = RF_ERROR_NONE;
+		break;
 	}while(false == RAIL_TimerExpired());
 
-	return gRF_mode.error;
+	return ret;
 }
 
 static void st_idle(UINT8 n)
@@ -406,6 +427,7 @@ static void st_idle(UINT8 n)
 //	ISR_set_timer_ccrp(TRUE, n, LIRC_2S);	//开ggrp_wor_period S的定时
 //	A7106_Cmd(CMD_SLEEP);
 	RAIL_RfIdle();
+	n = (0==n) ? 1:n;
 	RTCDRV_StartTimer(slaveRtcId, rtcdrvTimerTypePeriodic, n*2000, slaveTimerExpiredCallback, NULL);
 /*
 	T0_RX_3MS_OFF;							//关3msRX
@@ -418,9 +440,9 @@ static void st_idle(UINT8 n)
 	}
 */
 }
-static RF_ERROR_T st_wkup(RFID id, UINT8 chl)
+static RF_ERROR_T st_wkup(RFID id, UINT8 chl)//todo
 {
-//	RF_ERROR_T ret = RF_ERROR_NONE;
+	RF_ERROR_T ret = RF_ERROR_UNKNOWN;
 //    A7106_Cmd(CMD_STBY);
 //    Delay_MS(2);
 //	A7106_SetChannel(chl); 		//写入group参数
@@ -430,26 +452,20 @@ static RF_ERROR_T st_wkup(RFID id, UINT8 chl)
 //	ret = rf_receive();
 //	ISR_set_timer_ccra(FALSE, 0, LIRC_100MS);
 
-	myret = RF_ERROR_RX_TIMEOUT;
 	if (RAIL_TimerIsRunning()) {
 		RAIL_TimerCancel();
 	}
 	RAIL_RfIdle();
-	myChangeRadioConfig(chl, DEFAULT_BPS, (uint8_t*)&id.ID[0], sizeof(stRecvBuff));
+	myChangeRadioConfig(gRFInitData.set_wkup_ch, RX_BPS, (UINT8*)&id.ID, sizeof(stRecvBuff));
+	memset(gRFbuf.buff , 0, sizeof(gRFbuf.buff));
 	received_data = false;
-	RAIL_RxStart(0);
-	RAIL_TimerSet(SET_WOR_REC_TIME, RAIL_TIME_DELAY);
-	do{
-		while (false == RAIL_TimerExpired()  && false==received_data);
-		if (1 == appendedInfo.crcStatus){
-			RAIL_TimerCancel();
-			myret = RF_ERROR_NONE;
-			break;
-		}else {
-			RAIL_RxStart(0);
-			myret |= RF_ERROR_RF_CRC;
-		}
-	}while(false == RAIL_TimerExpired());
+	received_tmout = false;
+//	rail_status("a");
+//	RAIL_RxStart(0);
+	RAIL_TimerSet(WKUP1_REC_TIME, RAIL_TIME_DELAY);
+	ret = rf_receive();
+	RAIL_TimerCancel();
+
 	gRxOverflow = FALSE;
 	gbit_map = 0;
 	gpkg_cnt = 0;
@@ -462,7 +478,7 @@ static RF_ERROR_T st_wkup(RFID id, UINT8 chl)
 	bremote_flg = FALSE;
 	memset((UINT8*)crc_buff,0, sizeof(crc_buff));
 	
-	return myret;
+	return ret;
 }
 
 static void st_RF_init(void)
@@ -471,7 +487,7 @@ static void st_RF_init(void)
 //	A7106_Init();
 }
 
-static RF_ERROR_T st_set_wor(void)//todo
+static RF_ERROR_T st_set_wor(void)//
 {
 	RFID buff;	
 	RF_ERROR_T ret = RF_ERROR_UNKNOWN;
@@ -503,7 +519,7 @@ static RF_ERROR_T st_set_wor(void)//todo
 	memset(gRFbuf.buff , 0, sizeof(gRFbuf.buff));
 	received_data = false;
 	received_tmout = false;
-	rail_status("a");
+//	rail_status("a");
 //	RAIL_RxStart(0);
 	RAIL_TimerSet(SET_WOR_REC_TIME, RAIL_TIME_DELAY);
 	do{
@@ -513,7 +529,7 @@ static RF_ERROR_T st_set_wor(void)//todo
 			ret |= RF_ERROR_RX_TIMEOUT;
 			RAIL_RfIdle();
 //			UDELAY_Delay(1000);
-			rail_status("b");
+//			rail_status("b");
 			break;
 		}
 		if (1 == appendedInfo.crcStatus){
@@ -560,7 +576,7 @@ static RF_ERROR_T st_group_WOR(void)
 	memset(gRFbuf.buff , 0, sizeof(gRFbuf.buff));
 	received_data = false;
 	received_tmout = false;
-	rail_status("a");
+//	rail_status("c");
 //	RAIL_RxStart(0);
 	RAIL_TimerSet(SET_WOR_REC_TIME, RAIL_TIME_DELAY);
 	do{
@@ -570,7 +586,7 @@ static RF_ERROR_T st_group_WOR(void)
 			ret |= RF_ERROR_RX_TIMEOUT;
 			RAIL_RfIdle();
 //			UDELAY_Delay(1000);
-			rail_status("b");
+//			rail_status("d");
 			break;
 		}
 		if (1 == appendedInfo.crcStatus){
@@ -582,7 +598,7 @@ static RF_ERROR_T st_group_WOR(void)
 	}while(false == RAIL_TimerExpired());
 	RAIL_TimerCancel();
 
-	return myret;
+	return ret;
 }
 
 static void data_layer_ack(void)		//question
@@ -635,7 +651,7 @@ static void data_layer_ack(void)		//question
 	gtx.ack.crc = my_cal_crc16(0, (UINT8 *)&gtx.buff[0], sizeof(gtx)-2);
 	gtx.ack.crc = my_cal_crc16(gtx.ack.crc, (UINT8 *)&gRFInitData.esl_id, sizeof(gRFInitData.esl_id));		
 }
-//todo
+//
 void wakeup_wait(UINT16 tm)
 {
 	/*
@@ -652,11 +668,14 @@ void wakeup_wait(UINT16 tm)
 	}
 	_CLRWDT;	
 	*/
+	RTCDRV_Delay(tm*10);
+	/*
 	if (RAIL_TimerIsRunning()) {
 		RAIL_TimerCancel();
 	}
 	RAIL_TimerSet(tm*10, RAIL_TIME_DELAY);
 	while (false == RAIL_TimerExpired());
+	*/
 }
 
 static BOOL rf_loop_condition(void)
@@ -727,7 +746,7 @@ void rf_fsm(void)//todo
 			    	gsolt -= 600;
 			    	gRF_mode.next_st = RF_ST_SET_IDLE;
 			    } else {
-					st_sleep();
+					st_sleep();//
 					gRF_mode.next_st = RF_ST_GROUP_WOR;																	
 			    } 																										  
 				break;				
@@ -996,7 +1015,7 @@ static void link_layer_cmd(void)
 			tmp = gRFInitData.grp_wkup_id.ID[2]%MAX_GROUP;
 			if (gRFbuf.swp.grp_mask[tmp/8] &  (0x01 << (tmp&0x07))){			//group mask 匹配				
 				gsolt =  (UINT16)(gRFbuf.buff[0]&0X1f)<<8  |  gRFbuf.swp.solt_l;					
-				grp_wor_period = set_time(gRFbuf.swp.para >> 4);								//
+
 				work_time = set_time(gRFbuf.swp.para & WORK_TIME_MASK);								
 				gRF_mode.next_st = RF_ST_GROUP_SLEEP1;								
 			} else {															//不匹配
@@ -1199,15 +1218,15 @@ void data_layer_cmd(stRecvBuff *p)
 		gall_crc = all_crc16();	
 	}
 }
-void mode_change(void)
+void mode_change(void)//todo
 {
 	switch(gRFbuf.buff[0]&DATA_CTRL_MASK){
 		case LINK_CTRL_QUERY:
 			data_layer_ack();
-			a7106_tx_data(gRFInitData.master_id, RF_ACKPKG_LEN, (UINT8*)gtx.buff,TX_BPS);
+			a7106_tx_data(gRFInitData.master_id, sizeof(st_tx_buff), (UINT8*)gtx.buff,TX_BPS);
 //			A7106_SetBPS(RX_BPS);
 //			A7106_WriteID(gRFInitData.esl_id);
-			myChangeRadioConfig(DEFAULT_CHANNEL, RX_BPS, (uint8_t*)&gRFInitData.esl_id, 26);
+
 			if (RF_ST_GROUP_TRANSFER == gRF_mode.current_st){
 				gRF_mode.next_st = RF_ST_GROUP_TRANSFER;
 			}else if (RF_ST_ESL_TRANSFER == gRF_mode.current_st){
@@ -1258,7 +1277,7 @@ void mode_change(void)
 
 }
 
-static RF_ERROR_T a7106_tx_data(RFID id, UINT8 len, UINT8 *buf, UINT16 kbps) 
+static UINT8 a7106_tx_data(RFID id, UINT8 len, UINT8 *buf, bps_enum kbps)
 {
 /*
 	UINT8 i;
@@ -1278,20 +1297,28 @@ static RF_ERROR_T a7106_tx_data(RFID id, UINT8 len, UINT8 *buf, UINT16 kbps)
 	Delay_100US(2);
   }
 */
+	UINT8 i = 0, ret = 0;
 	RAIL_TxData_t txInfo;
 	RAIL_RfIdle();
 	myChangeRadioConfig(gRFInitData.reserve, kbps, (UINT8*)&id.ID, len);
 	txInfo.dataPtr = buf;
-	txInfo.dataLength = 16;
+	txInfo.dataLength = len;
     RAIL_TxDataLoad(&txInfo);
-    RAIL_TxStart(0, NULL, NULL);
+    while(i<3){
+    	ret = RAIL_TxStart(0, NULL, NULL);
+    	if (0 == ret){
+    		break;
+    	}
+    	i++;
+
+    }
+    return ret;
   
-  return RF_ERROR_NONE;//定时器超时
 }
 
 void HeartBeat(void)
 {  
-#define HEARTBEAT_CHANNEL 2
+#define HEARTBEAT_CHANNEL 10
 	static uint8_t hb_info_cnt = 0;
 	RAIL_TxData_t txInfo;
 //  	UINT8 i = 0;
@@ -1333,9 +1360,9 @@ void HeartBeat(void)
 //	A7106_SetFIFOLen(sizeof(gtx.rhb_buff));
 //	A7106_WriteFIFO((UINT8 *)&gtx.rhb_buff, sizeof(gtx.rhb_buff));
 //	A7106_SetBPS(TX_BPS);
-	myChangeRadioConfig(HEARTBEAT_CHANNEL, TX_BPS, (uint8_t*)&gRFInitData.master_id, 16);
+	myChangeRadioConfig(HEARTBEAT_CHANNEL, TX_BPS, (uint8_t*)&gRFInitData.master_id, sizeof(gtx.rhb_buff));
 	txInfo.dataPtr = gtx.buff;
-	txInfo.dataLength = 16;
+	txInfo.dataLength = sizeof(gtx.rhb_buff);
     RAIL_TxDataLoad(&txInfo);
 //	_emi = 0;
 	INT_Disable();

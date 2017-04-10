@@ -318,14 +318,20 @@ int main(void)
   System_Init();
   test_id();
   gRF_mode.next_st = RF_ST_SET_WOR;
+  BSP_LedToggle(0);
   while(1)
   {
 //todo
 		while(0 != gEventFlag){
 			if(gEventFlag&EVENT_FLAG_RFDATA)
 			{
-				gEventFlag ^= EVENT_FLAG_RFDATA;
+				gEventFlag = 0;
+				//gEventFlag ^= EVENT_FLAG_RFDATA;
 				rf_fsm();
+			}
+			if (gEventFlag&EVENT_FLAG_HEARTBEAT){
+				gEventFlag ^= EVENT_FLAG_HEARTBEAT;
+				HeartBeat();
 			}
 		}
 
@@ -753,6 +759,7 @@ void slaveTimerExpiredCallback( RTCDRV_TimerID_t id, void *incomingPacket)
     }
   }
   */
+//	gEventFlag |= EVENT_FLAG_HEARTBEAT;
 	gEventFlag |= EVENT_FLAG_RFDATA;
 }
 /*
