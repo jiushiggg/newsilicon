@@ -48,7 +48,7 @@ UINT16 my_cal_crc16(UINT16 crc,UINT8 *ptr,UINT16 len)  /*cal crc*/
 }
 BOOL rf_pgk_crc(UINT8 *ptr,UINT16 len,RFID rfid)
 {
- // UINT16 crc_t= 0;
+  UINT16 crc_t= 0;
  crc_t = my_cal_crc16(crc_t,ptr,len-sizeof(crc_t));
  crc_t = my_cal_crc16(crc_t,(UINT8 *)&rfid,sizeof(RFID));
  if (0 != memcmp(ptr+24,(UINT8 *)&crc_t,sizeof(crc_t)))

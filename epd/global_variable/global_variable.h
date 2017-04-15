@@ -314,5 +314,4 @@ extern RTCDRV_TimerID_t slaveRtcId;  // RTC timer ID
 extern RAIL_TxData_t slaveTxData;    // application payload sent during a TX
 extern bool slaveRtcRunning;         // boolean for RTC status
 
-extern volatile UINT16 crc_t;
 #endif

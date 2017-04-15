@@ -5,6 +5,7 @@
 
 // Memory manager configuration
 #define MAX_BUFFER_SIZE 26
+#define UNCHANGED_LEN	0XFF
 extern uint8_t receiveBuffer[MAX_BUFFER_SIZE];
 
 void myChangeRadioConfig(uint8_t channel, bps_enum bps, uint8_t* ID, uint8_t len);

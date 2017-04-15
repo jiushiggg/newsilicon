@@ -169,5 +169,4 @@ RTCDRV_TimerID_t slaveRtcId;  // RTC timer ID
 RAIL_TxData_t slaveTxData;    // application payload sent during a TX
 bool slaveRtcRunning;         // boolean for RTC status
 
-volatile UINT16 crc_t= 0;
 #pragma pack()

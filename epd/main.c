@@ -182,8 +182,11 @@ bpsconf:
 	}
 
 	//len
-	lencnf[1] = len-1;
-	if (RAIL_RadioConfig((void*)configList[4])) { while(1); }
+	if ( UNCHANGED_LEN != len){
+		lencnf[1] = len-1;
+		if (RAIL_RadioConfig((void*)configList[4])) { while(1); }
+	}
+
 }
 /*
 void test_id(void)

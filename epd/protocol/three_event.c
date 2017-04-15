@@ -1757,7 +1757,7 @@ RF_ERROR_T ret_ack_rf_config(RF_T *rf)
   return RF_ERROR_NONE;
 */
   RAIL_RfIdle();
-  myChangeRadioConfig(fram1_data_channel, TX_BPS, (UINT8*)&INFO_DATA.gRFInitData.master_id,   16);
+  myChangeRadioConfig(fram1_data_channel, TX_BPS, (UINT8*)&INFO_DATA.gRFInitData.master_id,   UNCHANGED_LEN);
   return RF_ERROR_NONE;
 }
 
@@ -1788,7 +1788,10 @@ RF_ERROR_T a7106_tx_data(UINT8 len, UINT8 *buf)
 	while(i<25){
 		ret = RAIL_TxStart(0, NULL, NULL);
 		if (0 == ret){
+			while(RAIL_RF_STATE_IDLE != RAIL_RfStateGet());
 			return RF_ERROR_NONE;//ÕýÈ·
+		}else {
+			RAIL_RfIdleExt(RAIL_IDLE_ABORT, TRUE);
 		}
 		i++;
 	}
@@ -1834,7 +1837,7 @@ RF_ERROR_T rf_cmd_sleep(RF_T *rf)
   if (RAIL_TimerIsRunning()) {
 	RAIL_TimerCancel();
   }
-  RAIL_RfIdle();
+  RAIL_RfIdleExt(RAIL_IDLE_FORCE_SHUTDOWN, TRUE);
   return RF_ERROR_NONE;
   
 }
@@ -1995,6 +1998,7 @@ UINT16 A7106_Tx_HBR_info(UINT8 *buf)
   while(i<3){
   	ret = RAIL_TxStart(0, NULL, NULL);
   	if (0 == ret){
+  		while(RAIL_RF_STATE_IDLE != RAIL_RfStateGet());
   		break;
   	}
   	i++;

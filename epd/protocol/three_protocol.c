@@ -188,6 +188,7 @@ int rf_state_machine(RF_T *rf)
       break;
       
     case RF_FSM_CMD_RX_FRAME1:
+//      memset(rf_buf , 0, RF_NORMAL_PACKET);
       err = rf_cmd_rx_fram1(rf, rf_buf);
       if (err == RF_ERROR_NONE)
       {
@@ -208,7 +209,6 @@ int rf_state_machine(RF_T *rf)
       if (err == RF_ERROR_NONE)
       {   
         if(TRUE != crc_normal_pkg_fun(rf_buf))
-//    	if (TRUE != rf_pgk_crc(rf_buf,RF_NORMAL_PACKET,INFO_DATA.gRFInitData.esl_id))
         {
           rf->next_cmd = RF_FSM_CMD_RX_DATA;
           break;
