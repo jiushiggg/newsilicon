@@ -84,6 +84,7 @@ void slaveTimerExpiredCallback( RTCDRV_TimerID_t id, void *incomingPacket);
 uint32_t change_syncword(uint32_t souce);
 void bsp_init(void);
 void myRAILtest(void);
+void sys_io_test(void);
 /******************************************************************************
  * App constants and variables
  *****************************************************************************/
@@ -137,9 +138,9 @@ void set_iodebug(void)
 	char *para1[] =  {"mytx", "PC10", "TXACTIVE"};
 	char *para2[] =  {"myrx", "PC11", "RXACTIVE"};
 	char *para3[] =  {"myrx", "PF3", "PTIDATA"};
-	setDebugSignal(3, para1);
+	//setDebugSignal(3, para1);
 	setDebugSignal(3, para2);
-	setDebugSignal(3, para3);
+	//setDebugSignal(3, para3);
 }
 void myChangeRadioConfig(uint8_t channel, bps_enum bps, uint8_t* ID, uint8_t len)
 {
@@ -243,6 +244,7 @@ void sys_working_process(void)
           my_ack_buf.srn_time++;
           Init_EPD();
         }
+        Init_EPD();	//ggg debug
         gEventFlag &= (~EVENT_FLAG_EPD_DISPLAY);
         SetWathcDog();
       }
@@ -503,10 +505,55 @@ int main(void)
 
   sys_load_page_display_fun();
   adc_voltage();
-  gEventFlag |= EVENT_FLAG_RFWORK;
+
+  gEventFlag |= EVENT_FLAG_EPD_DISPLAY;
+  sys_io_test();
   sys_working_process();
+
 }
 
+void sys_io_test(void)
+{
+	GPIO_PinModeSet(CONTROL_SCREEN_PORT, CONTROL_SCREEN_PIN, gpioModePushPull, 0);
+	GPIO_PinModeSet(CONTROL_COM_PORT, CONTROL_COM_PIN, gpioModePushPull, 0);
+	/*
+	while(1){
+		UDELAY_Delay(1000);
+		GPIO_PinOutSet(EPD_SPI_CK_PORT, EPD_SPI_CK_PIN);
+		UDELAY_Delay(1000);
+		GPIO_PinOutClear(EPD_SPI_CK_PORT, EPD_SPI_CK_PIN);
+	}
+	*/
+/*
+	while(1){
+		UDELAY_Delay(1000);
+		GPIO_PinModeSet(EPD_ENVDD_PORT, EPD_ENVDD_PIN, gpioModeWiredAnd, 0);
+		UDELAY_Delay(1000);
+		GPIO_PinModeSet(EPD_ENVDD_PORT, EPD_ENVDD_PIN, gpioModeWiredAnd, 1);
+	}
+*/
+/*
+	while(1){
+		GPIO_PinModeSet(EPD_SPI_CK_PORT, EPD_SPI_CK_PIN, gpioModePushPull, 1);
+		GPIO_PinModeSet(EPD_SPI_SDA_PORT, EPD_SPI_SDA_PIN, gpioModePushPull, 1);
+		GPIO_PinModeSet(EPD_SPI_CS_PORT, EPD_SPI_CS_PIN, gpioModePushPull, 1);
+		GPIO_PinModeSet(EPD_BUSY_PORT, EPD_BUSY_PIN, gpioModePushPull, 1);
+		GPIO_PinModeSet(EPD_RST_PORT, EPD_RST_PIN, gpioModePushPull, 1);
+		GPIO_PinModeSet(EPD_CD_PORT, EPD_CD_PIN, gpioModePushPull, 1);
+		GPIO_PinModeSet(EPD_ENVDD_PORT, EPD_ENVDD_PIN,  , 1);
+
+		UDELAY_Delay(1000);
+		GPIO_PinModeSet(EPD_SPI_CK_PORT, EPD_SPI_CK_PIN, gpioModeWiredAnd, 0);
+		GPIO_PinModeSet(EPD_SPI_SDA_PORT, EPD_SPI_SDA_PIN, gpioModePushPull, 0);
+		GPIO_PinModeSet(EPD_SPI_CS_PORT, EPD_SPI_CS_PIN, gpioModePushPull, 0);
+		GPIO_PinModeSet(EPD_BUSY_PORT, EPD_BUSY_PIN, gpioModePushPull, 0);
+		GPIO_PinModeSet(EPD_RST_PORT, EPD_RST_PIN, gpioModePushPull, 0);
+		GPIO_PinModeSet(EPD_CD_PORT, EPD_CD_PIN, gpioModePushPull, 0);
+		GPIO_PinModeSet(EPD_ENVDD_PORT, EPD_ENVDD_PIN, gpioModePushPull, 0);
+		UDELAY_Delay(1000);
+	}
+*/
+}
 void myRAILtest(void)
 {
 	  myChangeRadioConfig(INFO_DATA.gRFInitData.set_wkup_ch, RX_BPS, (UINT8*)&INFO_DATA.gRFInitData.wakeup_id, RF_SET_WAKEUP_PACKET);
@@ -758,6 +805,9 @@ void bsp_init(void)
 	  // Initialize the chip
 	  CHIP_Init();
 	  // Initialize the system clocks and other HAL components
+
+//	  CMU_ClockSelectSet(cmuClock_CORE,cmuSelect_HFRCO);
+	  //CMU_HFRCOBandSet(cmuHFRCOFreq_4M0Hz);
 	  halInit();
 
 	  CMU_ClockEnable(cmuClock_GPIO, true);
@@ -783,6 +833,8 @@ void bsp_init(void)
 	  GPIO_IntConfig(buttonArray[0].port, buttonArray[0].pin, false, true, true);
 	  GPIO_IntConfig(buttonArray[1].port, buttonArray[1].pin, false, true, true);
 
+		GPIO_PinModeSet(CONTROL_SCREEN_PORT, CONTROL_SCREEN_PIN, gpioModePushPull, 0);
+		GPIO_PinModeSet(CONTROL_COM_PORT, CONTROL_COM_PIN, gpioModePushPull, 0);
 	  // Initialize Radio
 	  RAIL_RfInit(&railInitParams);
 
@@ -801,7 +853,6 @@ void bsp_init(void)
 
 	  set_iodebug();
 	  BSP_LedsInit();
-
 	  RTCDRV_Init();
 	  RTCDRV_AllocateTimer( &slaveRtcId ); // Reserve a timer
 	  RTCDRV_StartTimer(slaveRtcId, rtcdrvTimerTypePeriodic, 8000, slaveTimerExpiredCallback, NULL);

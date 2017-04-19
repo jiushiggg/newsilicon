@@ -377,7 +377,7 @@ static void SPI_Write(UINT8 value){
       EPD_W21_MOSI_0;		
     value = (value << 1); 	
     SPI_Delay(2);
-    UDELAY_Delay(1)	//TODO
+    Delay_us(1);	//TODO
     EPD_W21_CLK_1; 
     SPI_Delay(2);
   }
@@ -504,7 +504,8 @@ void display_lcd(file_id_t fd)
     f_read(F_BMP_RED, (295-pcnt) * 16 ,data_red, 16);  
     for (i = 0; i < 16; i++)
     {                 
-      data[i] &= (data_red[i]);    
+      data[i] &= (data_red[i]);
+      //data[i] = 0xf0;
       EPD_W21_WriteDATA(data[i]);
     }  
   } 

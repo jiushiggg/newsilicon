@@ -49,7 +49,7 @@
 
 #define RF_PKG_TYPE                      0xc000    //osd传输时数据包的类型 00：正常数据包 11：结束数据包
 
-#define SET_WOR_REC_TIME	300000	//3ms
+#define SET_WOR_REC_TIME	3000	//3ms
 #define GRP_WOR_REC_TIME	3000	//3ms
 #define WKUP1_REC_TIME		1000000	//1s
 #define DATA_REC_TIME		4000000	//4s

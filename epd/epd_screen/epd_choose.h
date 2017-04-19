@@ -56,7 +56,7 @@
 #define DIRECTION_180
 #define DIRECTION_270
 
-#define VERSION_OP5      (80)
+#define VERSION_OP5      (100)
 #define SCREEN_WIDTH    (WORD)(296)
 #define SCREEN_HEIGHT   (WORD)(128)                    
 #define ELEMENT_SIZE_K (WORD)(172)             //´æ·ÅÔªËØdataÇø
