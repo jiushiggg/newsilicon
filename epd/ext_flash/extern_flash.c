@@ -1,12 +1,16 @@
 #include "extern_flash.h"
 #include "delay.h"
 #include "datatype.h"
-
+#include "em_usart.h"
+#include "mx25flash_spi.h"
 
 #define  SPI_NOT_BUSY  spi_not_busy()
 
+void Initial_Spi();
+
 //此函数只提供超时退出机制，不返回是否成功失败
 //MONITOR static void spi_not_busy(void) UPDATA_SEGMENT
+
 static void spi_not_busy(void) 
 {
 /*
@@ -28,7 +32,11 @@ static UINT8 FLASH_SPI_ReadByte(void)
   SPI_NOT_BUSY; 	
   return UCA0RXBUF;
 */
-  return 1;
+	uint8_t data_buf;
+	SPI_NOT_BUSY;
+	data_buf = USART_SpiTransfer( MX25_USART, 0xff );
+	SPI_NOT_BUSY;
+	return data_buf;
 }
 
 //MONITOR static void FLASH_SPI_WriteByte(UINT8 Data) UPDATA_SEGMENT
@@ -38,23 +46,21 @@ static void FLASH_SPI_WriteByte(UINT8 Data)
   SPI_NOT_BUSY; 
   UCA0TXBUF = Data;
 */
+	SPI_NOT_BUSY;
+	USART_SpiTransfer( MX25_USART, Data);
 }
 
 //MONITOR static void FLASH_SPI_Close(void) UPDATA_SEGMENT
 static void FLASH_SPI_Close(void) 
 {
-/*
   SPI_NOT_BUSY;
   Delay_us_20();
   FLASH_CS_1;
-*/
 }
 
 static void FLASH_SPI_Open(void) 
 {
-/*
   FLASH_CS_0;
-*/
 }
 
 
@@ -161,10 +167,10 @@ void FLASH_Read(WORD start_addr, UINT8 * readBuf, WORD readcnt)
   FLASH_WaitBusy();
 }
 
-#if 0
+#if 1
 //芯片ID读取,包括两种读操作：一种是ID有效位为16位,一种为24位
-UINT32 FLASH_ReadID(UINT8 readtype){
   UINT32 Manufact_ID1 = 0, Product_ID1 = 0 ,Product_ID2 = 0;
+UINT32 FLASH_ReadID(UINT8 readtype){
   UINT32 Chip_ID; 
   FLASH_SPI_Open();
   
@@ -277,13 +283,13 @@ void segment_erase(WORD seg_addr)
 //MONITOR void segment_write(WORD addr, WORD data, WORD len) UPDATA_SEGMENT
 void segment_write(WORD addr, WORD data, WORD len)
 {
-  FLASH_PageProgram(addr, (BYTE *)(UINT16)(data&0xffff), len);
+  FLASH_PageProgram(addr, (BYTE *)(UINT32)(data&0xffffffff), len);
 }
 
 //MONITOR void segment_read(WORD addr, WORD buf, WORD len) UPDATA_SEGMENT
 void segment_read(WORD addr, WORD buf, WORD len) 
 {
-  FLASH_Read(addr, (BYTE *)(UINT16)(buf&0xffff), len);
+  FLASH_Read(addr, (BYTE *)(UINT32)(buf&0xffffffff), len);
 }
 
 
@@ -302,12 +308,11 @@ void restore_ext_spi_flashio(void)
 
 void FLASH_deep_close_miso(void)
 {
-/*
+
   FLASH_MISO_IN;
   FLASH_MISO_IO_MODE;
   FLASH_MISO_REN_OPEN;
   FLASH_MISO_0;
-*/
 }
 
 //MONITOR void flash_spi_init(BOOL on) UPDATA_SEGMENT
@@ -335,22 +340,86 @@ void flash_spi_init(BOOL on)
     FLASH_deep_close_miso();	
   }
 */
+	if(on)
+	{
+		USART_InitSync_TypeDef init = USART_INITSYNC_DEFAULT;
+
+		CMU_ClockEnable( cmuClock_GPIO, true );
+		CMU_ClockEnable( MX25_USART_CLK, true );
+
+		init.msbf     = true;
+		init.baudrate = 8000000;
+		USART_InitSync( MX25_USART, &init );
+
+		/* IO config */
+		GPIO_PinModeSet( MX25_PORT_MOSI, MX25_PIN_MOSI, gpioModePushPull, 1 );
+		GPIO_PinModeSet( MX25_PORT_MISO, MX25_PIN_MISO, gpioModeInput,    0 );
+		GPIO_PinModeSet( MX25_PORT_SCLK, MX25_PIN_SCLK, gpioModePushPull, 1 );
+		GPIO_PinModeSet( MX25_PORT_CS,   MX25_PIN_CS,   gpioModePushPull, 1 );
+
+		MX25_USART->ROUTELOC0 = ( USART_ROUTELOC0_RXLOC_LOC11 | USART_ROUTELOC0_TXLOC_LOC11 | USART_ROUTELOC0_CLKLOC_LOC11 );
+		MX25_USART->ROUTEPEN  = ( USART_ROUTEPEN_RXPEN | USART_ROUTEPEN_TXPEN | USART_ROUTEPEN_CLKPEN );
+
+		/* Wait for flash warm-up */
+		Initial_Spi();
+	}
+	else
+	{
+	    //并不能省电
+	    FLASH_DeepPowerDown(TRUE);
+	    FLASH_deep_close_miso();
+	}
 }
 
 
 
 void extern_flash_cs_init(void)
 {
-/*
+
   FLASH_CS_OUT;
   FLASH_CS_IO_MODE;
   FLASH_CS_REN_CLOSE;
-*/
+
 }
 void disable_extern_flash(void)
 {
-/*
+
   extern_flash_cs_init();
   FLASH_CS_1;
-*/
+
 }
+
+/*
+ --Common functions
+ */
+
+/*
+ * Function:       Wait_Flash_WarmUp
+ * Arguments:      None.
+ * Description:    Wait some time until flash read / write enable.
+ * Return Message: None.
+ */
+/*
+void Wait_Flash_WarmUp()
+{
+    volatile int time_cnt = FlashFullAccessTime;
+    while( time_cnt > 0 )
+    {
+        time_cnt--;
+    }
+}
+*/
+/*
+ * Function:       Initial_Spi
+ * Arguments:      None
+ * Description:    Initial spi flash state and wait flash warm-up
+ *                 (enable read/write).
+ * Return Message: None
+ */
+/*
+void Initial_Spi()
+{
+   // Wait flash warm-up
+   Wait_Flash_WarmUp();
+}
+*/

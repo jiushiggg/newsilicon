@@ -54,7 +54,7 @@
 #include "bit_display.h"
 #include "adc10.h"
 #include "main.h"
-
+#include "mx25flash_spi.h"
 
 // Display buffer size
 #ifndef APP_DISPLAY_BUFFER_SIZE
@@ -469,6 +469,7 @@ void sys_working_process(void)
 uint8_t buf[26] = {1,2,3,4,5,6};
 RAIL_TxData_t txInfo;
 uint32_t t= 0;
+#if 1
 int main(void)
 {
   bsp_init();
@@ -485,6 +486,7 @@ int main(void)
   isr_reed_init();                      //关闭干簧管中断
 //  nfc_init();                           //nfc初始化
   flash_spi_init(TRUE);                 //外部flash，标准SPI初始化
+//  spi_test();
   f_init();
 //  test_save_id();
   sys_load_config_info();                //加载系统默认值
@@ -511,7 +513,55 @@ int main(void)
   sys_working_process();
 
 }
+#else
+int main(void)
+{
+	CHIP_Init();
+	halInit();
+//	USTIMER_Init();
 
+	  //RTC Init -- for system timekeeping and other useful things
+//	RTCDRV_Init();
+
+//	CMU_ClockEnable(cmuClock_GPIO, true);
+	GRAPHICS_Init();
+	GRAPHICS_Sleep();
+	MX25_init();
+//	flash_spi_init(TRUE);
+
+	spi_test();
+}
+#endif
+
+#define LEN	10
+uint8_t mybuff[LEN] = {0};
+extern void FLASH_PageProgram(WORD start_addr, UINT8 *writebuf, WORD writecnt);
+extern void FLASH_Read(WORD start_addr, UINT8 * readBuf, WORD readcnt);
+extern UINT32 FLASH_ReadID(UINT8 readtype);
+
+void spi_test(void)
+{
+	volatile uint8_t i = 0;
+	static uint32_t manufact_id = 0;
+
+	for (i=0; i<LEN; i++){
+		mybuff[i] = 0x77;
+	}
+
+	manufact_id = FLASH_ReadID(0x9F);
+//	MX25_SE(0);
+	segment_erase(0);
+//	MX25_PP( 0, mybuff, LEN);
+//	FLASH_PageProgram(0, mybuff, LEN);
+	segment_write(0, (WORD)&mybuff, LEN);
+	for (i=0; i<LEN; i++){
+		mybuff[i] = 0;
+	}
+//	MX25_READ( 0, mybuff, LEN );
+	FLASH_Read(0, mybuff, LEN);
+	segment_read(0, (WORD)&mybuff, LEN);
+	while(1);
+}
 void sys_io_test(void)
 {
 	GPIO_PinModeSet(CONTROL_SCREEN_PORT, CONTROL_SCREEN_PIN, gpioModePushPull, 0);

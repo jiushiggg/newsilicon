@@ -10,7 +10,8 @@
 #define SUPER_ADDR	((WORD)(SEGMENT_SIZE * FS_BLOCK + EF_STAA_DDR))
 
 extern const fs_t fs_table;
-fs_t fs;
+//todo 20170503
+//fs_t fs;
 
 enum {
   FS_FLAG_CHANGED	= 0x01,

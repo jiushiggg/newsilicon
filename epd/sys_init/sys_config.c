@@ -225,6 +225,7 @@ void sys_load_config_info(void)
   
   def_sys_attr.exit_grp_wkup_cont = GROUP_MAX_TIMES ;                 //grp唤醒最大次数为3分钟
   ret = load_extern_rf_info();                          //加载rf配置信息
+  ret =TRUE;
   if(ret == TRUE)                                       //外部配置信息正确
     return ;
   

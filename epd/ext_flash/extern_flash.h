@@ -4,28 +4,41 @@
 //#include "msp430g2755.h"
 #include "..\sys_init\datatype.h"
 #include "..\epd_screen\epd_choose.h"
-
+#include "em_device.h"
+#include "em_gpio.h"
+#include "em_cmu.h"
 
 /*------------外部flash IO定义----------*/
+#define MX25_PORT_MOSI         gpioPortC
+#define MX25_PIN_MOSI          6
+#define MX25_PORT_MISO         gpioPortC
+#define MX25_PIN_MISO          7
+#define MX25_PORT_SCLK         gpioPortC
+#define MX25_PIN_SCLK          8
+#define MX25_PORT_CS           gpioPortA
+#define MX25_PIN_CS            4
+
+#define MX25_USART             USART1
+#define MX25_USART_CLK         cmuClock_USART1
 //------------------------------cs--------------
 //设置输入输出模式
-#define FLASH_CS_OUT
+#define FLASH_CS_OUT			GPIO_PinModeSet( MX25_PORT_CS, MX25_PIN_CS, gpioModePushPull, 1);
 #define FLASH_CS_IN
 #define FLASH_CS_IO_MODE
 //是否打开上下拉电阻
 #define FLASH_CS_REN_CLOSE
 #define FLASH_CS_REN_OPEN
-#define FLASH_CS_0
-#define FLASH_CS_1
+#define FLASH_CS_0				GPIO_PinOutClear( MX25_PORT_CS, MX25_PIN_CS )
+#define FLASH_CS_1				GPIO_PinOutSet( MX25_PORT_CS, MX25_PIN_CS )
 
 #define FLASH_SPI_IO
 #define FLASH_SPI_MODE
 
-#define  FLASH_MISO_IN
+#define  FLASH_MISO_IN			GPIO_PinModeSet( MX25_PORT_MISO, MX25_PIN_MISO, gpioModeInput, 0 );
 #define  FLASH_MISO_IO_MODE
-#define  FLASH_MISO_REN_CLOSE
-#define  FLASH_MISO_REN_OPEN
-#define  FLASH_MISO_0
+#define  FLASH_MISO_REN_CLOSE	GPIO_PinModeSet( MX25_PORT_MISO, MX25_PIN_MISO, gpioModeInput, 0 );
+#define  FLASH_MISO_REN_OPEN	GPIO_PinModeSet( MX25_PORT_MISO, MX25_PIN_MISO, gpioModeInputPull, 0 );
+#define  FLASH_MISO_0			GPIO_PinOutClear( MX25_PORT_MISO, MX25_PIN_MISO )
     
 
 

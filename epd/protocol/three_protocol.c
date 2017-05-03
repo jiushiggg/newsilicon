@@ -96,10 +96,10 @@ int rf_state_machine(RF_T *rf)
 		set_wor_flag_fun(RF_FSM_CMD_GRP_EXIT_LOOP);
 		if(gro_wor_times > def_sys_attr.exit_grp_wkup_cont)
 		{
-		gro_wor_times= 0;
-		set_wor_flag_fun(RF_FSM_CMD_SET_EXIT_LOOP);
-		rf->next_cmd = RF_FSM_CMD_SET_WAKEUP;
-		break;
+			gro_wor_times= 0;
+			set_wor_flag_fun(RF_FSM_CMD_SET_EXIT_LOOP);
+			rf->next_cmd = RF_FSM_CMD_SET_WAKEUP;
+			break;
 		}
 		rf_grp_wor(rf);
       //smclk_timer_isr(TRUE,1,RF_RP_WKUP_TIME_3MS_HALF);	todo

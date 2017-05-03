@@ -653,6 +653,8 @@ RF_ERROR_T rf_cmd_rx_fram1(RF_T *rf, uint8_t *buf)
 	memset((uint8_t*)&appendedInfo , 0, sizeof(RAIL_AppendedInfo_t));
 	received_data = FALSE;
 	RAIL_RxStart(0);
+//todo 20170503
+
 	if(!check_gpio1_finish())
 	{
 		return RF_ERROR_RX_TIMEOUT;//定时器超时
@@ -661,7 +663,6 @@ RF_ERROR_T rf_cmd_rx_fram1(RF_T *rf, uint8_t *buf)
 		return RF_ERROR_RF_CRC;//crc错误
 	}
 	memcpy(buf, receiveBuffer, RF_NORMAL_PACKET);
-
 	return RF_ERROR_NONE;//正确
 }
 
